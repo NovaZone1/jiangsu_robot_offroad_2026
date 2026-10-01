@@ -35,6 +35,16 @@ extern "C"
     /// @brief 禁用PWM输出
     void BspTIMPWM_Disable(BspTIMPWM_TypeDef *pwm_inst);
 
+    // 可检查 HAL 错误的新接口；原 void 接口保留兼容性。
+    HAL_StatusTypeDef BspTIMPWM_Init(BspTIMPWM_TypeDef *inst, TIM_HandleTypeDef *htim,
+                                     uint32_t channel);
+    HAL_StatusTypeDef BspTIMPWM_Start(BspTIMPWM_TypeDef *inst);
+    HAL_StatusTypeDef BspTIMPWM_Stop(BspTIMPWM_TypeDef *inst);
+    HAL_StatusTypeDef BspTIMPWM_WriteDuty(BspTIMPWM_TypeDef *inst, float duty);
+    // 同一定时器的两个通道，临界区内提交并立即装载，适用于双输入 H 桥。
+    HAL_StatusTypeDef BspTIMPWM_WritePair(BspTIMPWM_TypeDef *first, float first_duty,
+                                          BspTIMPWM_TypeDef *second, float second_duty);
+
 #ifdef __cplusplus
 }
 #endif

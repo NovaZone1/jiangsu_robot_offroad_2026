@@ -23,10 +23,12 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Bsps | std_cpp、frame_config | C/C++ 桥接和框架容量/周期配置 |
 | Mods | std_actuator、led | V1_main 通用执行器及普通指示灯 |
 | Mods | std_sensor | V1_main 通用 GPIO 传感器；改为固定容量，去除动态分配及旧 UART 灰度协议 |
-| Mods | dc_motor、ultrasonic、gray_sensor | 新建三类模块接口和实现位置，硬件驱动待编写；未绑定时不伪造就绪状态 |
+| Mods / Bsps | dc_motor、motor_pwm_driver、bsp_motor_board | 本板 AT8236 双 PWM、310 编码器 RPM、独立速度 PID 和四路板级资源；待实物验证 |
+| Mods | ultrasonic、gray_sensor | 模块接口和实现位置，硬件采集驱动待编写；未绑定时不伪造就绪状态 |
 | Sys | StateCore、Action | 移植状态图、状态切换、动作超时/取消及非阻塞等待；修正当前状态复制、空图和空指针问题 |
 | Sys | Application、System、Monitor、RtosCpp、SysDefs | 应用生命周期独立于系统调度；保留注册、自检、日志和任务桥接，使用 F103 比赛配置和单线程框架调度 |
 | Apps | MainFrame、OffroadApp | 板级模块绑定入口、越野应用及比赛策略的扩展位置 |
+| Apps | MotorTest | 独立四轮试验：等待 2 秒、前进 5 秒、后退 5 秒、禁能停止；当前已启用 |
 
 `Libs → Bsps`；Algorithm 为独立层，算法头文件位于 `Algorithm/Inc`，
 源文件位于 `Algorithm/Src`，原 Bsps 下的三个算法已经迁回 Algorithm，避免重复编译。
@@ -36,16 +38,21 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
 
 ## 三类新模块的位置
 
-- `Mods/Inc/dc_motor.hpp`、`Mods/Src/dc_motor.cpp`：预留有符号占空比、停止和可选 RPM 反馈接口。
-  需要补充实际 H 桥的方向脚、PWM 通道、刹车/滑行方式、换向死区、编码器 CPR 和减速比。
+- `Mods/Inc/dc_motor.hpp`、`Mods/Src/dc_motor.cpp`：生命周期、占空比和输出轴 RPM 速度 PID 接口。
+  配套 `motor_pwm_driver` 和 `Bsps/bsp_motor_board` 已适配 AT8236 与 310 电机；详见 [电机说明](Mods/MOTOR.md)。
 - `Mods/Inc/ultrasonic.hpp`、`Mods/Src/ultrasonic.cpp`：预留新测距数据及有效时间戳。
   需要按型号补充触发/回波捕获或串口协议、测量超时、触发间隔和距离换算。
 - `Mods/Inc/gray_sensor.hpp`、`Mods/Src/gray_sensor.cpp`：预留最多 16 路采样及标定结果。
   需要按型号补充 GPIO/ADC/串口读取、白线与背景标定、通道位置。
   `GetLineError()` 只计算已标定数据的加权偏差，不代替实际采集驱动。
 
-这些文件已有可编译接口、参数检查和失效处理，但没有真实硬件采集/驱动实现。
-`Apps/Src/MainFrame.cpp` 集中绑定实际句柄和引脚；默认没有任何硬件绑定，保持自检等待。
+电机已有实际硬件驱动，超声波和灰度仍只有接口、参数检查及失效处理。
+`Apps/Src/MainFrame.cpp` 集中绑定四轮：M1 左前、M2 左后、M3 右前、M4 右后。
+底层初始化保持禁能，当前测试入口显式配置 PID，等待反馈后自动使能。
+`FRAME_MOTOR_TEST_ENABLED=1` 使默认任务只运行 `MotorBench`，不执行比赛/传感器循环。
+设为 0 后恢复比赛调度；传感器未绑定时仍保持自检等待。
+方向和非零 PWM 死区补偿已对照用户提供的官方 `car_tracking`：左侧反向输出、右侧反向反馈。
+实际接线仍需架空验证；测试 USART1/PA9 通过板载 CH340 输出启动和故障日志。
 绑定的驱动、GPIO/UART 注册对象、应用和状态图必须保持静态或全程有效的生命周期。
 初始化/注册只能在框架任务开始前完成，或由同一个框架任务执行。
 
@@ -62,7 +69,7 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
 4. 四类障碍及决赛悬崖的通过策略；当前资料的文字部分未给出全部障碍参数，须结合图和实车确认。
 5. 起止黑线识别、起跑脱离判断、三圈计数，以及轮子越线后、触碰前方障碍前停车。
 
-当前 `Control()` 会保持停车，包括已绑定驱动、请求进入 WORKING 的情况，
+比赛模式的 `OffroadApp::Control()` 会保持停车，包括已绑定驱动、请求进入 WORKING 的情况，
 直至真实控制策略完成。运行中关键传感器过期会取消动作、禁用状态机并调用电机停止接口。
 灰度默认新鲜度阈值 50 ms，超声波 200 ms，实车时应根据采样周期调整。
 规则中的比赛耗时/罚时由裁判记录，不能用传感器默认值假定已完成圈数或障碍。
@@ -81,7 +88,8 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
 Action 的 `Wait/WaitUntil` 必须传入 `blocked`、`seq_tick`，建议配合 `SEQLIZE/SEQPARAM`。
 
 TIM6 专用于 HAL 时间基准，不能分配给电机、编码器或超声波。
-PWM/编码器必须由 CubeMX 正确初始化、开启时钟、配置 GPIO/AFIO 和必要的中断后才能绑定。
+电机 PWM/编码器已由 `BspMotorBoard_Init()` 初始化时钟、GPIO、AFIO 和定时器，不使用定时器中断。
+TIM1/8、TIM2/3/4/5 保留给四路电机；此次 `.ioc` 未修改，不得重复生成/运行另一套电机初始化。
 PWM ARR 建议不大于 65534，以便 CCR=ARR+1 表示完全导通；ARR=65535 时最大 CCR 为 65535。
 ADC BSP 当前提供单通道单次读取，不等同于多通道扫描 DMA 驱动。
 UART RX DMA 当前要求普通模式，循环 DMA 需另外实现增量索引处理。
@@ -122,10 +130,10 @@ FreeRTOS 默认任务栈改为 512 words（2048 bytes），heap_4 为 8192 bytes
 
 ## 编译与验证
 
-V6 完整 Rebuild 的日志位于 `MDK-ARM/build-frame-v6.log`。
+本次四轮测试版本 V6 完整 Rebuild 的日志位于 `MDK-ARM/build-motor-test-v6.log`。
 AXF/HEX 位于 `MDK-ARM/jiangsu_robot_offroad_2026/`。
 框架所有 Src 文件已加入 Keil 五个 `Frame/*` 分组，并增加 UART/ADC 所需的 F1 HAL 源文件。
-仅启用 HAL 库支持，没有擅自分配外设实例或引脚。
+电机按本板原理图配置资源；超声波和灰度仍等待确认并绑定各自的采集外设。
 
 主机回归测试使用真实框架源文件及模拟时钟/RTOS接口：
 
@@ -135,7 +143,11 @@ AXF/HEX 位于 `MDK-ARM/jiangsu_robot_offroad_2026/`。
 
 覆盖矩阵/CMSIS 运算、求逆不修改输入、Kalman 控制输入、IV 重置、ADRC 初始化与限幅，
 以及 DWT 溢出、PID 限幅/重置/零周期、状态机切换不覆盖原状态、动作超时/取消、
-未绑定模块保护、数据过期停止和日志长度。主机测试不验证引脚、ADC精度、编码器方向或实车性能。
+未绑定模块保护、数据过期停止和日志长度。
+电机测试另覆盖实际双 PWM/编码器 BSP、换向与计数回绕、资源冲突/释放、HAL 失败、
+禁能/超时保护及速度 PID 使能条件、饱和积分处理。
+四轮试验另验证 2/5/5 秒阶段边界、只执行一次、四轮同时停机、方向错误和持续无计数。
+主机测试不验证引脚、ADC 精度、编码器方向或实车性能。
 
 CubeMX 重新生成后，在 Keil 关闭工程再执行：
 

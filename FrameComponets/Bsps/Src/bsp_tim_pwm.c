@@ -1,22 +1,22 @@
 #include "bsp_tim_pwm.h"
 #include <math.h>
+#include <string.h>
 
-/**
- * @brief  获取PWM频率
- * @param  pwm_inst PWM实例
- * @retval PWM频率（Hz）
- */
-static float GetFreq(struct BspTIMPWM_t pwm_inst)
+static uint8_t IsValid(const BspTIMPWM_TypeDef *inst)
 {
-    // 检验定时器句柄有效性
-    if (pwm_inst.htim == NULL || pwm_inst.htim->Instance == NULL)
-    {
-        return 0.0f; // 定时器句柄无效
-    }
+    return inst && inst->htim && inst->htim->Instance &&
+           IS_TIM_CCX_INSTANCE(inst->htim->Instance, inst->channel) &&
+           __HAL_TIM_GET_AUTORELOAD(inst->htim) <= 65535U;
+}
 
-    // TIM1/TIM8 位于 APB2，其余定时器位于 APB1；总线分频时定时器时钟倍频。
+static float GetFreq(struct BspTIMPWM_t inst)
+{
+    if (!IsValid(&inst))
+    {
+        return 0;
+    }
     uint32_t pclk, divider;
-    if (pwm_inst.htim->Instance == TIM1 || pwm_inst.htim->Instance == TIM8)
+    if (inst.htim->Instance == TIM1 || inst.htim->Instance == TIM8)
     {
         pclk = HAL_RCC_GetPCLK2Freq();
         divider = RCC->CFGR & RCC_CFGR_PPRE2;
@@ -26,118 +26,126 @@ static float GetFreq(struct BspTIMPWM_t pwm_inst)
         pclk = HAL_RCC_GetPCLK1Freq();
         divider = RCC->CFGR & RCC_CFGR_PPRE1;
     }
-    uint32_t timer_clock_freq = pclk * (divider ? 2U : 1U) / (pwm_inst.htim->Instance->PSC + 1U);
-    // 计算PWM频率 = 定时器时钟频率 / (ARR + 1)
-    float pwm_freq = (float)timer_clock_freq / (pwm_inst.auto_reload_value + 1);
-
-    return pwm_freq;
+    const float clock = (float)pclk * (divider ? 2.0f : 1.0f);
+    return clock / ((float)inst.htim->Instance->PSC + 1.0f) /
+           ((float)__HAL_TIM_GET_AUTORELOAD(inst.htim) + 1.0f);
 }
 
-/**
- * @brief  注册PWM实例
- * @param  pwm_inst PWM实例
- * @param  htim     定时器句柄
- * @param  channel  PWM通道
- */
-void BspTIMPWM_InstRegist(BspTIMPWM_TypeDef *pwm_inst, TIM_HandleTypeDef *htim, uint32_t channel)
+HAL_StatusTypeDef BspTIMPWM_Init(BspTIMPWM_TypeDef *inst, TIM_HandleTypeDef *htim, uint32_t channel)
 {
-    // 检验参数有效性
-    if (pwm_inst == NULL || htim == NULL || htim->Instance == NULL ||
-        !IS_TIM_CCX_INSTANCE(htim->Instance, channel))
+    if (!inst)
     {
-        return; // 参数无效
+        return HAL_ERROR;
     }
-
-    // 配置PWM实例的相关参数
-    pwm_inst->htim = htim; // 定时器句柄
-    pwm_inst->channel = channel; // PWM通道
-    pwm_inst->enabled = 0;
-
-    // 获取ARR寄存器的值
-    pwm_inst->auto_reload_value = __HAL_TIM_GET_AUTORELOAD(pwm_inst->htim);
-    // 获取CCR寄存器的值
-    pwm_inst->compare_value = __HAL_TIM_GET_COMPARE(pwm_inst->htim, pwm_inst->channel);
-    // 给函数指针赋值
-    pwm_inst->GetFreq = GetFreq;
-    // 计算PWM频率
-    pwm_inst->freq = pwm_inst->GetFreq(*pwm_inst);
-
-    // 初始化PWM的占空比为0
-    BspTIMPWM_SetDuty(pwm_inst, 0.0f);
+    memset(inst, 0, sizeof(*inst));
+    inst->htim = htim;
+    inst->channel = channel;
+    if (!IsValid(inst))
+    {
+        inst->htim = NULL;
+        return HAL_ERROR;
+    }
+    inst->GetFreq = GetFreq;
+    inst->freq = GetFreq(*inst);
+    return BspTIMPWM_WriteDuty(inst, 0);
 }
 
-/**
- * @brief  设置PWM占空比
- * @param  pwm_inst PWM实例
- * @param  duty     占空比（0.0 - 1.0）
- */
-void BspTIMPWM_SetDuty(BspTIMPWM_TypeDef *pwm_inst, float duty)
+HAL_StatusTypeDef BspTIMPWM_WriteDuty(BspTIMPWM_TypeDef *inst, float duty)
 {
-    if (!pwm_inst || !pwm_inst->htim || !isfinite(duty))
+    if (!IsValid(inst) || !isfinite(duty))
     {
-        return;
+        return HAL_ERROR;
     }
-    // 检查输入的占空比范围
-    if (duty < 0.0f)
+    if (duty < 0)
     {
-        duty = 0.0f;
+        duty = 0;
     }
-    if (duty > 1.0f)
+    if (duty > 1)
     {
-        duty = 1.0f;
+        duty = 1;
     }
-
-    // 更新PWM实例的占空比
-    pwm_inst->duty = duty;
-
-    // 计算CCR的对应值
-    pwm_inst->auto_reload_value = __HAL_TIM_GET_AUTORELOAD(pwm_inst->htim);
-    pwm_inst->compare_value = (uint32_t)((pwm_inst->auto_reload_value + 1U) * duty);
-    if (pwm_inst->compare_value > 65535U)
+    inst->auto_reload_value = __HAL_TIM_GET_AUTORELOAD(inst->htim);
+    uint32_t compare = (uint32_t)((inst->auto_reload_value + 1U) * duty);
+    if (compare > 65535U)
     {
-        pwm_inst->compare_value = 65535U;
+        compare = 65535U;
     }
-    // 更新定时器的比较寄存器
-    __HAL_TIM_SET_COMPARE(pwm_inst->htim, pwm_inst->channel, pwm_inst->compare_value);
+    inst->duty = duty;
+    inst->compare_value = compare;
+    __HAL_TIM_SET_COMPARE(inst->htim, inst->channel, compare);
+    return HAL_OK;
 }
 
-/**
- * @brief  启用PWM输出
- * @param  pwm_inst PWM实例
- */
-void BspTIMPWM_Enable(BspTIMPWM_TypeDef *pwm_inst)
+HAL_StatusTypeDef BspTIMPWM_WritePair(BspTIMPWM_TypeDef *first, float first_duty,
+                                      BspTIMPWM_TypeDef *second, float second_duty)
 {
-    // 检查参数有效性
-    if (pwm_inst == NULL || pwm_inst->htim == NULL)
+    if (!IsValid(first) || !IsValid(second) || first->htim->Instance != second->htim->Instance ||
+        first->channel == second->channel || !isfinite(first_duty) || !isfinite(second_duty))
     {
-        return; // 参数无效
+        return HAL_ERROR;
     }
 
-    if (!pwm_inst->enabled)
-    {
-        // 启动PWM输出
-        pwm_inst->enabled = HAL_TIM_PWM_Start(pwm_inst->htim, pwm_inst->channel) == HAL_OK;
-    }
+    const uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    // 先清除旧指令，再写新值；UG 立即提交预装载，Stop 不等下一次 PWM 周期。
+    BspTIMPWM_WriteDuty(first, 0);
+    BspTIMPWM_WriteDuty(second, 0);
+    BspTIMPWM_WriteDuty(first, first_duty);
+    BspTIMPWM_WriteDuty(second, second_duty);
+    first->htim->Instance->EGR = TIM_EGR_UG;
+    __set_PRIMASK(mask);
+    return HAL_OK;
 }
 
-/**
- * @brief  禁用PWM输出
- * @param  pwm_inst PWM实例
- */
-void BspTIMPWM_Disable(BspTIMPWM_TypeDef *pwm_inst)
+HAL_StatusTypeDef BspTIMPWM_Start(BspTIMPWM_TypeDef *inst)
 {
-    // 检查参数有效性
-    if (pwm_inst == NULL || pwm_inst->htim == NULL)
+    if (!IsValid(inst))
     {
-        return; // 参数无效
+        return HAL_ERROR;
     }
+    if (inst->enabled)
+    {
+        return HAL_OK;
+    }
+    const HAL_StatusTypeDef status = HAL_TIM_PWM_Start(inst->htim, inst->channel);
+    inst->enabled = status == HAL_OK;
+    return status;
+}
 
-    if (pwm_inst->enabled)
+HAL_StatusTypeDef BspTIMPWM_Stop(BspTIMPWM_TypeDef *inst)
+{
+    if (!IsValid(inst))
     {
-        // 停止PWM输出
-        if (HAL_TIM_PWM_Stop(pwm_inst->htim, pwm_inst->channel) == HAL_OK)
-        {
-            pwm_inst->enabled = 0;
-        }
+        return HAL_ERROR;
     }
+    if (!inst->enabled)
+    {
+        return HAL_OK;
+    }
+    const HAL_StatusTypeDef status = HAL_TIM_PWM_Stop(inst->htim, inst->channel);
+    if (status == HAL_OK)
+    {
+        inst->enabled = 0;
+    }
+    return status;
+}
+
+void BspTIMPWM_InstRegist(BspTIMPWM_TypeDef *inst, TIM_HandleTypeDef *htim, uint32_t channel)
+{
+    (void)BspTIMPWM_Init(inst, htim, channel);
+}
+
+void BspTIMPWM_SetDuty(BspTIMPWM_TypeDef *inst, float duty)
+{
+    (void)BspTIMPWM_WriteDuty(inst, duty);
+}
+
+void BspTIMPWM_Enable(BspTIMPWM_TypeDef *inst)
+{
+    (void)BspTIMPWM_Start(inst);
+}
+
+void BspTIMPWM_Disable(BspTIMPWM_TypeDef *inst)
+{
+    (void)BspTIMPWM_Stop(inst);
 }

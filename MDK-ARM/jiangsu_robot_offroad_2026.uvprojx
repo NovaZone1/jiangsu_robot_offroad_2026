@@ -696,6 +696,16 @@
               <FilePath>../FrameComponets/Bsps/Src/bsp_gpio.c</FilePath>
             </File>
             <File>
+              <FileName>bsp_motor_board.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../FrameComponets/Bsps/Src/bsp_motor_board.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_motor_console.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../FrameComponets/Bsps/Src/bsp_motor_console.c</FilePath>
+            </File>
+            <File>
               <FileName>bsp_tim_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>../FrameComponets/Bsps/Src/bsp_tim_pwm.c</FilePath>
@@ -724,6 +734,11 @@
               <FileName>led.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/led.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>motor_pwm_driver.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/motor_pwm_driver.cpp</FilePath>
             </File>
             <File>
               <FileName>std_actuator.cpp</FileName>
@@ -784,6 +799,11 @@
               <FileName>MainFrame.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Apps/Src/MainFrame.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>MotorTest.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/MotorTest.cpp</FilePath>
             </File>
             <File>
               <FileName>OffroadApp.cpp</FileName>

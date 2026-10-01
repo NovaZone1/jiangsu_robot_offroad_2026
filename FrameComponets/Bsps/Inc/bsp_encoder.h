@@ -15,6 +15,7 @@ extern "C"
 
     HAL_StatusTypeDef BspEncoder_Init(BspEncoder_Instance *, TIM_HandleTypeDef *);
     int32_t BspEncoder_Sample(BspEncoder_Instance *);
+    HAL_StatusTypeDef BspEncoder_SampleChecked(BspEncoder_Instance *, int32_t *delta);
 #ifdef __cplusplus
 }
 #endif
