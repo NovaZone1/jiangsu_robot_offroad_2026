@@ -1,0 +1,39 @@
+# Keil 编译输出；工程配置、启动汇编、RTE 头文件仍需提交。
+/MDK-ARM/jiangsu_robot_offroad_2026/
+*.o
+*.obj
+*.d
+*.crf
+*.dep
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.lnp
+
+# CMSIS 的 .lib/.a 是工程依赖，不能作为普通编译产物排除。
+
+# 本机 IDE 状态、CubeMX 缓存及构建日志。
+*.uvguix.*
+*.uvgui.*
+*.uvopt
+*.uvoptx
+.vscode/
+.idea/
+.mxproject
+*.log
+*.log.lock
+
+# 主机测试输出。
+/tests/frame/out/
+
+# 编辑器临时文件及系统元数据。
+*.bak
+*.tmp
+*.swp
+*~
+Thumbs.db
+Desktop.ini
+.DS_Store
