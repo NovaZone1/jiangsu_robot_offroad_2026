@@ -1,4 +1,4 @@
-> 当前状态：已按用户要求撤下超声波＋OLED临时测试。MainFrame已恢复原入口，Keil中5个测试相关源文件条目已移除。下文接入步骤仅为历史说明，不代表当前已启用。
+> 当前状态：超声波与灰度 OLED 临时测试均已撤下。OLED 驱动保留但不参与当前固件编译；[灰度测试记录](gray_oled_test.md)保留用户反馈。下文测距显示接入步骤仅为历史说明。
 > 专用RangeDisplayApp已从FrameComponets移出，仅保留在tests/frame/fixtures供主机回归测试使用。可复用驱动保留，未参与当前固件编译。不要重新应用旧接入补丁；不要用Sync-FrameProject将暂存驱动重新加入工程。用户的Keil版本及RTE设置保留。
 
 # 原厂 OLED 显示超声波距离

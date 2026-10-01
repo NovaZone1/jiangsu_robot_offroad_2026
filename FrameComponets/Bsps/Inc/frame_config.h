@@ -10,5 +10,10 @@
 #define FRAME_REQUIRED_LAPS 3U
 #define FRAME_MAX_MOTORS 8U
 
-// 当前固件执行一次四轮速度测试；恢复比赛调度时改为 0 后重新编译。
-#define FRAME_MOTOR_TEST_ENABLED 1U
+// 电机试验已从固件撤下；保留配置名，防止旧配置被误认为仍可自动转动。
+#define FRAME_MOTOR_TEST_ENABLED 0U
+// 灰度 OLED 临时试验也已撤下；保留配置名，试验源码仅用于主机回归。
+#define FRAME_GRAY_OLED_TEST_ENABLED 0U
+#if FRAME_MOTOR_TEST_ENABLED || FRAME_GRAY_OLED_TEST_ENABLED
+#error "Bench tests are no longer firmware entry points"
+#endif
