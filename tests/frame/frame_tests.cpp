@@ -15,6 +15,9 @@
 TestDwt test_dwt = {};
 TestCoreDebug test_core_debug = {};
 uint32_t test_tick = 0, test_primask = 0;
+void RunMotorTests();
+void RunMotorTestSequenceTests();
+void RunMotorConsoleTests();
 static int first_calls, second_calls, stop_calls;
 
 static void First(StateCore *)
@@ -230,8 +233,11 @@ int main()
     assert(!left.Bind({nullptr, nullptr, StopDriver, nullptr}));
     assert(left.Bind({nullptr, DutyDriver, StopDriver, nullptr}));
     assert(right.Bind({nullptr, DutyDriver, StopDriver, nullptr}));
+    assert(!left.IsEnabled() && !left.SetDuty(1));
+    assert(left.Enable() && right.Enable());
     assert(left.SetDuty(2) && left.GetDuty() == 1);
     assert(!left.SetDuty(std::numeric_limits<float>::quiet_NaN()) && left.GetDuty() == 0);
+    assert(left.ClearFault() && left.Enable());
     gray.Bind(nullptr, ReadGray);
     range.Bind(nullptr, ReadRange);
     test_tick = 100;
@@ -259,6 +265,7 @@ int main()
     range_sample.distance_mm = -1;
     assert(!range.Update());
     left.Bind({nullptr, DutyFailure, StopDriver, nullptr});
+    assert(left.Enable());
     assert(!left.SetDuty(0.5f) && left.GetDuty() == 0);
     assert(stop_calls > 0);
 
@@ -270,6 +277,9 @@ int main()
     long_message[511] = 0;
     monitor.LogInfo("%s", long_message);
     assert(strlen(log_result) <= 127 && log_result[strlen(log_result) - 1] == '\n');
+    RunMotorTests();
+    RunMotorTestSequenceTests();
+    RunMotorConsoleTests();
     puts("PASS: matrix/CMSIS, Kalman input, IV reset, ADRC guards, DWT rollover, PID, states, "
          "actions and module guards");
 }

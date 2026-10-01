@@ -9,11 +9,17 @@
 - 开发环境为 STM32CubeMX + Keil µVision，使用 ARM Compiler V6。
 - FreeRTOS 使用 `portable/GCC/ARM_CM3` 移植层；不能切回 RVDS，也不能同时编译两个 `port.c`。
 - 参考框架为 V1_main，原 F407 代码已经适配 F103；原 `Libs` 在本工程对应 `Bsps`。
-- 电机、超声波和灰度目前只有模块接口、数据检查和扩展位置，实际硬件驱动仍待开发。
-- 框架未绑定实际引脚，默认等待自检；`OffroadApp::Control()` 目前始终停车，尚未实现比赛自动驾驶。
+- 四路电机已实现 AT8236 双 PWM、310 编码器 RPM 和独立速度 PID；尚未实物验证。
+- M1 左前、M2 左后、M3 右前、M4 右后，方向设置集中在 `MainFrame.cpp`。
+- 当前 `FRAME_MOTOR_TEST_ENABLED=1`：上电等待 2 秒，然后 +60 RPM 5 秒、-60 RPM 5 秒，最后禁能四轮。
+  测试初值 Kp=0.0008、Ki=0.005、Kd=0，控制量限幅 15%，叠加官方 2000/3600 死区补偿后实际上限约 70.6%。
+  驱动另外限制实际 PWM 不超过 75%；这些 PID 值仍待实测。
+- 超声波和灰度仍待硬件驱动及绑定；恢复比赛模式后仍等待自检。
+- `OffroadApp::Control()` 目前始终停车，尚未实现比赛自动驾驶。
 - 当前版本已通过 V6 完整编译和主机回归测试；后续修改须重新验证，编译通过不代表实车验证通过。
 
-传感器型号、驱动板型号、引脚及定时器分配尚未确定。不得根据参考 F407 工程或个人猜测直接填入。
+电机资源依据用户提供的 YB-DSF01 原理图和亚博资料确定，详见 [电机说明](FrameComponets/Mods/MOTOR.md)。
+超声波和灰度的具体采集方式仍需各自负责人确认，不得根据参考 F407 工程直接填入。
 
 ## 2. 分工及修改范围
 
@@ -21,7 +27,7 @@
 
 | 负责人 | 主要文件 | 可复用的底层支持 | 交付目标 |
 | --- | --- | --- | --- |
-| 电机负责人（项目发起人） | `FrameComponets/Mods/Inc/dc_motor.hpp`、`Mods/Src/dc_motor.cpp` | `Bsps` 的 PWM、GPIO、编码器；`Algorithm` 的 PID | 左右电机方向、占空比、可靠停止，可选轮速反馈 |
+| 电机负责人（项目发起人） | `FrameComponets/Mods` 的 `dc_motor`、`motor_pwm_driver`；`Bsps` 的 `bsp_motor_board` | PWM、编码器及 `Algorithm` 的 PID | 实测正反转、停止、RPM，再调速度 PID |
 | 超声波负责人 | `FrameComponets/Mods/Inc/ultrasonic.hpp`、`Mods/Src/ultrasonic.cpp` | `Bsps` 的 DWT、GPIO/EXTI、UART；按型号补充捕获支持 | 非阻塞测距、新数据时间戳、超时及无效测量处理 |
 | 灰度负责人 | `FrameComponets/Mods/Inc/gray_sensor.hpp`、`Mods/Src/gray_sensor.cpp` | `Bsps` 的 GPIO、ADC、UART | 多通道采样、标定、归一化、完整新帧交付 |
 
@@ -41,19 +47,24 @@
 
 ## 3. 先约定硬件资源，再写驱动
 
-三人先共同填写下表。尚未确定的资源保持“待定”，确定后在同一变更中更新本文和 `.ioc`。
+已确定的电机资源如下，其他成员不得重复占用。尚未确定的资源保持“待定”。
+电机初始化当前由板级 BSP 管理，未修改 `.ioc`；其他外设确定后同步更新本文和 `.ioc`。
 
 | 用途 | GPIO / 外设 / 通道 | 负责人 | 备注 |
 | --- | --- | --- | --- |
-| 左电机方向及 PWM | 待定 | 电机 | 写明驱动板型号、有效电平及 PWM 频率 |
-| 右电机方向及 PWM | 待定 | 电机 | 写明前进极性及停止模式 |
-| 左右编码器（如配备） | 待定 | 电机 | 写明定时器、计数定义和减速比 |
+| 左前 M1 | PC6/PC7，TIM8 CH1/CH2；PD12/PD13，TIM4 CH1/CH2 | 电机 | AT8236，20 kHz，双低滑行；实际前进极性待实测 |
+| 左后 M2 | PC8/PC9，TIM8 CH3/CH4；PA15/PB3，TIM2 CH1/CH2 | 电机 | 310，减速比 20，13 线四倍频，输出轴 1040 计数/圈 |
+| 右前 M3 | PE9/PE11，TIM1 CH1/CH2；PA0/PA1，TIM5 CH1/CH2 | 电机 | 官方输出极性：左侧反向、右侧不反向；反馈左正右负 |
+| 右后 M4 | PE13/PE14，TIM1 CH3/CH4；PB5/PB4，TIM3 CH2/CH1 | 电机 | 方向表直接针对 TIM 原始计数，已涵盖实际 A/B 布线 |
+| 测试诊断串口 | USART1 TX，PA9，板载 CH340 | 电机测试 | 115200 8N1，仅测试模式启用；非阻塞单任务轮询，不新增中断 |
 | 超声波 | 待定 | 超声波 | 写明型号及触发/回波或 UART 协议 |
 | 灰度阵列 | 待定 | 灰度 | 写明型号、通道数、通道顺序及 GPIO/ADC/UART 方式 |
 | 状态 LED | 待定 | 三人协商 | 写明引脚和有效电平 |
 | TIM6 | HAL 时间基准，已占用 | 共享 | 不得用于电机、编码器或超声波 |
 
 分配时同时检查定时器通道、UART、DMA 通道、ADC 通道、AFIO 重映射和 EXTI 线是否冲突。
+TIM1/8 和 TIM2/3/4/5 保留给电机；TIM1/4 全重映射、TIM2 部分 1、TIM3 部分重映射已启用。
+JTAG 已关闭以使用 PA15/PB3/PB4，SWD 保留。其他模块不得改回相关 AFIO 设置。
 不同 GPIO 端口的同一引脚号共享 EXTI 线，不能当作两条独立外部中断使用。
 具体接线和电气兼容性依据实际板卡、模块资料核对。
 
@@ -61,6 +72,15 @@
 同一轮硬件配置由一人负责生成和合并，其他成员提交所需配置清单，避免同时生成工程覆盖彼此修改。
 
 ## 4. 电机模块怎么开发
+
+现有库的初始化、API、独立实测步骤及 PID 接入顺序见 [电机说明](FrameComponets/Mods/MOTOR.md)。
+`Init()` / `Bind()` 默认禁能；占空比模式需显式 `Enable()`。
+`Neutral()` / `Stop()` 清空目标并滑行，保留使能；`Disable()` 同时禁能。
+`FrameTickCpp()` 每 1 ms 调用批量控制，命令默认 250 ms 过期。
+用户已要求本次直接使用试验 PID；参数集中在 `Apps/Inc/MotorTest.hpp` 的 `Config`，不代表完成调参。
+库默认增益仍为零，测试入口显式配置四路并在反馈就绪后使能。
+独立测试循环通过编译开关替代比赛循环，不能让两个任务同时写输出。
+测试完成或故障后保持禁能，不自动重试；若方向错误或持续无计数则停止全部电机。
 
 现有 `DcMotor::Driver` 通过回调隔离实际驱动板：
 
@@ -80,7 +100,8 @@ bool ReadRpm(void *context, float *rpm); // 可选
 - 轮速反馈统一使用输出轮的 RPM，正值为前进。明确编码器每圈有效计数是否已经包含倍频和减速比。
   没有编码器或当前没有可信数据时返回 `false`，不能用目标转速冒充实测值。
 - 编码器采样应足够频繁，避免一次运动超过计数周期的一半；按实际 ARR 处理回绕。
-- 如实现速度闭环，用 `Algorithm` 的 PID，每个电机单独保存控制状态，并说明更新周期、单位和限幅。
+- 已复用 `Algorithm` 的 PID，每个电机单独保存状态；默认 RPM 反馈周期 10 ms、新鲜度 50 ms。
+  PID 参数单位基于 RPM 和秒，输出为占空比；不得把主机合成测试增益当作实车调参结果。
 
 验收至少覆盖：左右轮正反转、零占空比、限幅、重复停止、换向、驱动失败，
 以及存在编码器时的轮速方向、单位和回绕。先架空车轮测试，再进入整车联调。
@@ -142,18 +163,22 @@ bool ReadGray(void *context, GraySensor::Sample *sample);
 三人交付驱动上下文及回调后，由当次集成人在 `Apps/Src/MainFrame.cpp` 的 `BindHardware()` 中绑定：
 
 ```cpp
-// 以下名称由各负责人提供，示意绑定位置，不是已实现的硬件驱动。
-LeftMotor.Bind(left_driver);
-RightMotor.Bind(right_driver);
+// Motor1..4 已在 BindHardware() 中初始化并绑定，上电保持禁能。
+// 测试入口在等待反馈后显式使能，比赛模式则不自动使能。
+// 以下采集上下文及回调由传感器负责人提供，仍为示意名称。
 RangeSensor.Bind(&range_context, ReadRange);
 GrayArray.Bind(&gray_context, ReadGray);
 ```
 
 - 驱动上下文、BSP 注册对象、接收缓冲区等必须保持静态或全程有效，不能绑定函数退出即失效的局部对象。
 - 当前初始化在 `main()` 的 HAL、时钟、GPIO 初始化之后、RTOS 调度开始之前进行。
-  新增外设必须先执行对应的 `MX_*_Init()`，再执行 BSP/驱动初始化和绑定。
+  电机由 `BspMotorBoard_Init()` 完成初始化；不要再运行重复的 `MX_TIM*_Init()`。
+  其他新增外设先执行对应的初始化，再执行 BSP/驱动初始化和绑定。
 - 现有基础周期为 1 ms：更新 DWT、传感器采样，随后按分频更新系统，最后执行控制。
   应用、系统、状态机和动作的周期为 5 ms；状态机/动作仅在 WORKING 时运行。
+  最后调用 `DcMotor::ControlAllMotors()`，禁能状态也采集编码器。
+  当前电机测试模式改由 `MotorBench.Update()` 单独控制四轮，不执行比赛/传感器循环。
+  恢复比赛调度需把 `Bsps/Inc/frame_config.h` 的 `FRAME_MOTOR_TEST_ENABLED` 改为 0 并重新编译。
 - Reader 和控制回调应及时返回，不得在这条共享循环中等待硬件、执行阻塞日志或使用 `Seq::Wait/WaitUntil`。
 - 当前框架注册及应用操作由同一任务执行，不得从 ISR 修改注册表、调用 Monitor 或触发整套系统更新。
 - ISR 和任务之间的多字段数据交接要使用短临界区、双缓冲等明确同步方案；仅加 `volatile` 不能保证整帧一致。
