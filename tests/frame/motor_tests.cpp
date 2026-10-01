@@ -1,4 +1,5 @@
 #include "motor_pwm_driver.hpp"
+#include "MotorSpeedProfiles.hpp"
 #include <assert.h>
 #include <math.h>
 #include <limits>
@@ -298,6 +299,36 @@ void RunMotorTests()
         assert(temporary.Bind({&feedback, Write, Stop, nullptr}));
     }
     DcMotor::ControlAllMotors();
+
+    // 正式板级参数只允许禁能配置；滤波保留原始 RPM，无新样本不推进滤波。
+    motor.Disable();
+    assert(motor.ClearFault());
+    assert(!MotorSpeedProfiles::Apply(motor, 0, false));
+    assert(!MotorSpeedProfiles::Apply(motor, 5, false));
+    assert(MotorSpeedProfiles::Apply(motor, 2, false));
+    assert(!motor.IsEnabled() && motor.GetMode() == DcMotor::Mode::Speed);
+    test_tick = 2000;
+    feedback.rpm = 0;
+    feedback.fresh = true;
+    motor.Control();
+    assert(motor.Enable() && motor.SetSpeed(60));
+    assert(!MotorSpeedProfiles::Apply(motor, 2, true));
+    test_tick = 2010;
+    feedback.rpm = 40;
+    feedback.fresh = true;
+    motor.Control();
+    assert(motor.GetMeasure().speed_rpm == 40);
+    assert(fabsf(motor.GetFilteredRpm() - 10) < 0.001f);
+    test_tick = 2020;
+    motor.Control();
+    assert(fabsf(motor.GetFilteredRpm() - 10) < 0.001f);
+    motor.Disable();
+    assert(MotorSpeedProfiles::Apply(motor, 2, true));
+    test_tick = 2030;
+    feedback.fresh = true;
+    motor.Control();
+    assert(motor.GetFilteredRpm() == 40 && !motor.IsEnabled());
+
     puts("PASS: AT8236 PWM, reversal delay, encoder/RPM rollover, HAL failures, motor API and "
          "speed PID guards");
 }

@@ -1,5 +1,6 @@
 #include "MainFrame.hpp"
 #include "bsp_motor_board.h"
+#include "MotorSpeedProfiles.hpp"
 
 MotorPwmDriver Motor1Driver, Motor2Driver, Motor3Driver, Motor4Driver;
 DcMotor Motor1, Motor2, Motor3, Motor4;
@@ -47,18 +48,20 @@ namespace
             config.output_reverse = output_reverse[index];
             // 此表直接针对 TIM 原始计数，已经包含 M4 的实际 A/B 布线，不再额外异或。
             config.encoder_reverse = encoder_reverse[index];
-            config.deadzone_duty = 2000.0f / 3600.0f;
-            config.maximum_duty = 0.75f;
+            // 实测 PI 基于实际 PWM，不能叠加旧的固定死区补偿。
+            config.deadzone_duty = 0;
+            config.maximum_duty = MotorSpeedProfiles::duty_limit;
             if (!drivers[index]->Init(config))
             {
                 return false;
             }
-            if (!motors[index]->Init(drivers[index]->GetDriver()))
+            if (!motors[index]->Init(drivers[index]->GetDriver()) ||
+                !MotorSpeedProfiles::Apply(*motors[index], index + 1U, false))
             {
                 return false;
             }
         }
-        // 正方向需架空实测；output_reverse/encoder_reverse 分别校正驱动与反馈。
+        // 已实测方向；四轮配置前进 PI 后仍保持禁能，只有应用可显式使能。
         // 传感器负责人在这里补充各自驱动绑定。
         // RangeSensor.Bind(...);
         // GrayArray.Bind(...);

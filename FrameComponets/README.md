@@ -1,7 +1,9 @@
 # STM32F103ZE 越野比赛框架
 
 > 用户已反馈 [灰度＋OLED 诊断](../docs/gray_oled_test.md)检测无误，临时入口及编译项已撤下。
-> MotorTest 和 GrayOledTest 均只保留在主机测试 fixtures；当前运行原框架、自检等待，电机保持禁能。
+> 电机自动试车、串口调参及电机测试夹具已移除，恢复框架调度，上电四轮禁能。
+> 正式实测参数位于 `Apps/Inc/MotorSpeedProfiles.hpp`，配置不自动使能或提交速度目标。
+> 四轮架空正反转 40/60 RPM 实测已完成，32 次重复验证达标；见 [参数记录](../docs/motor_pid_20261001/README.md)。
 > 灰度、OLED、超声波适配源码保留供正式集成，目前没有启用这些硬件入口。
 
 移植参考为 [ZWJ_GeneralFramework 的 V1_main 分支](https://github.com/zwj051029/ZWJ_GeneralFramework/tree/V1_main)，
@@ -27,12 +29,12 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Bsps | std_cpp、frame_config | C/C++ 桥接和框架容量/周期配置 |
 | Mods | std_actuator、led | V1_main 通用执行器及普通指示灯 |
 | Mods | std_sensor | V1_main 通用 GPIO 传感器；改为固定容量，去除动态分配及旧 UART 灰度协议 |
-| Mods / Bsps | dc_motor、motor_pwm_driver、bsp_motor_board | 本板 AT8236 双 PWM、310 编码器 RPM、独立速度 PID 和四路板级资源；待实物验证 |
+| Mods / Bsps | dc_motor、motor_pwm_driver、bsp_motor_board | 本板 AT8236 双 PWM、310 编码器 RPM、独立速度 PID 与反馈滤波；已完成架空实测 |
 | Mods | ultrasonic、gray_sensor | 模块接口和实现位置，硬件采集驱动待编写；未绑定时不伪造就绪状态 |
 | Sys | StateCore、Action | 移植状态图、状态切换、动作超时/取消及非阻塞等待；修正当前状态复制、空图和空指针问题 |
 | Sys | Application、System、Monitor、RtosCpp、SysDefs | 应用生命周期独立于系统调度；保留注册、自检、日志和任务桥接，使用 F103 比赛配置和单线程框架调度 |
-| Apps | MainFrame、OffroadApp | 板级模块绑定入口、越野应用及比赛策略的扩展位置 |
-| tests/frame/fixtures | MotorTest、GrayOledTest | 已撤下的临时试验，仅用于主机回归，不参与固件编译 |
+| Apps | MainFrame、MotorSpeedProfiles、OffroadApp | 板级绑定、实测正反转 PI 配置、越野应用及比赛策略扩展位置 |
+| tests/frame/fixtures | GrayOledTest、RangeDisplayApp | 传感器主机回归夹具，不参与固件编译 |
 
 `Libs → Bsps`；Algorithm 为独立层，算法头文件位于 `Algorithm/Inc`，
 源文件位于 `Algorithm/Src`，原 Bsps 下的三个算法已经迁回 Algorithm，避免重复编译。

@@ -9,11 +9,17 @@
 - 开发环境为 STM32CubeMX + Keil µVision，使用 ARM Compiler V6。
 - FreeRTOS 使用 `portable/GCC/ARM_CM3` 移植层；不能切回 RVDS，也不能同时编译两个 `port.c`。
 - 参考框架为 V1_main，原 F407 代码已经适配 F103；原 `Libs` 在本工程对应 `Bsps`。
-- 四路电机已实现 AT8236 双 PWM、310 编码器 RPM 和独立速度 PID；尚未实物验证。
+- 四路电机已实现 AT8236 双 PWM、310 编码器 RPM 和独立速度 PID；正反转/停止已验证。
+  2026-10-01 完成四轮架空正反转 40/60 RPM 调参，32 次重复验证全部达标，落地联调尚待完成。
+  参数和条件见 [速度 PI 实测记录](docs/motor_pid_20261001/README.md)。
 - M1 左前、M2 左后、M3 右前、M4 右后，方向设置集中在 `MainFrame.cpp`。
 - 用户已反馈灰度 OLED 测试检测无误；临时入口已撤下，恢复原框架调度。
-  `FRAME_GRAY_OLED_TEST_ENABLED` 和 `FRAME_MOTOR_TEST_ENABLED` 均保留为 0。
-  MotorTest 与 GrayOledTest 仅保留在 `tests/frame/fixtures` 做主机回归，不参与固件构建。
+  `FRAME_GRAY_OLED_TEST_ENABLED` 保留为 0，传感器主机测试夹具不参与固件构建。
+- 电机自动试车、串口调参协议、专用串口 BSP 及其脚本/夹具已移除，默认任务恢复 FrameTickCpp。
+  上电四轮禁能，等待应用显式使能；不再执行前进/后退测试，也不初始化测试 USART1。
+  正式参数位于 `Apps/Inc/MotorSpeedProfiles.hpp`，初始化时配置各轮前进 PI，后退时禁能后 Apply。
+  参数单位基于 RPM 和秒，实际 PWM 上限 0.69、无旧死区补偿，反馈低通时间常数 0.03 秒。
+  目标限幅 160 RPM 只是命令边界，实测 PI 验证范围仍为架空 40/60 RPM。
 - 灰度、OLED 可复用驱动保留但未加入当前固件；灰度和超声波尚未绑定比赛接口，当前保持自检等待和停车。
   已确认的接线与测试记录见 [灰度 OLED 测试记录](docs/gray_oled_test.md)。
 - `OffroadApp::Control()` 目前始终停车，尚未实现比赛自动驾驶。
@@ -53,11 +59,11 @@
 
 | 用途 | GPIO / 外设 / 通道 | 负责人 | 备注 |
 | --- | --- | --- | --- |
-| 左前 M1 | PC6/PC7，TIM8 CH1/CH2；PD12/PD13，TIM4 CH1/CH2 | 电机 | AT8236，20 kHz，双低滑行；实际前进极性待实测 |
+| 左前 M1 | PC6/PC7，TIM8 CH1/CH2；PD12/PD13，TIM4 CH1/CH2 | 电机 | AT8236，20 kHz，双低滑行；正反转方向已实测 |
 | 左后 M2 | PC8/PC9，TIM8 CH3/CH4；PA15/PB3，TIM2 CH1/CH2 | 电机 | 310，减速比 20，13 线四倍频，输出轴 1040 计数/圈 |
 | 右前 M3 | PE9/PE11，TIM1 CH1/CH2；PA0/PA1，TIM5 CH1/CH2 | 电机 | 官方输出极性：左侧反向、右侧不反向；反馈左正右负 |
 | 右后 M4 | PE13/PE14，TIM1 CH3/CH4；PB5/PB4，TIM3 CH2/CH1 | 电机 | 方向表直接针对 TIM 原始计数，已涵盖实际 A/B 布线 |
-| 测试诊断串口 | USART1 TX，PA9，板载 CH340 | 电机测试 | 旧测试入口已撤下，当前固件不初始化此诊断串口 |
+| 板载串口 | USART1 PA9 TX / PA10 RX，板载 CH340 | 待正式分配 | 临时电机串口已移除，当前框架不初始化、不占用 USART1；FlyMCU 下载仍使用板载串口 |
 | 超声波 | 待定 | 超声波 | 写明型号及触发/回波或 UART 协议 |
 | 灰度阵列 | x1～x8：PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1 | 灰度 | 用户确认接线；8-LP 数字输入，OLED 按 x1～x8 显示；车体左右方向待安装确认 |
 | 原厂 OLED | I2C1 PB6/PB7，0x3C，128×32 | 显示 | 诊断已撤下，驱动保留；重用时保留 IRQ 唯一所有者 |
@@ -79,9 +85,12 @@ JTAG 已关闭以使用 PA15/PB3/PB4，SWD 保留。其他模块不得改回相�
 `Init()` / `Bind()` 默认禁能；占空比模式需显式 `Enable()`。
 `Neutral()` / `Stop()` 清空目标并滑行，保留使能；`Disable()` 同时禁能。
 `FrameTickCpp()` 每 1 ms 调用批量控制，命令默认 250 ms 过期。
-旧电机试验参数及流程仅保留在 `tests/frame/fixtures/MotorTest.hpp/.cpp`。
-库默认增益仍为零；当前入口不配置速度 PID、不使能电机。
-临时诊断循环已撤下，不能让两个任务同时写输出。
+临时电机试验和测试开关已删除；通用库默认增益仍为零。
+本板初始化显式应用实测前进 PI，保持禁能；`MotorSpeedProfiles::Apply(motor, port, backward)`
+只接受已初始化、禁能的电机，配置时清除旧目标和积分，完成后仍需显式 Enable。
+不能在每次提交目标时重复 Apply；使用后退参数时也必须先停车、禁能再切换。
+测得参数要求 `deadzone_duty=0`，不能叠加旧固定补偿。
+电机只由同一默认任务控制，不能让其他任务同时写输出。
 
 现有 `DcMotor::Driver` 通过回调隔离实际驱动板：
 
@@ -179,7 +188,7 @@ GrayArray.Bind(&gray_context, ReadGray);
   应用、系统、状态机和动作的周期为 5 ms；状态机/动作仅在 WORKING 时运行。
   最后调用 `DcMotor::ControlAllMotors()`，禁能状态也采集编码器。
   灰度显示和电机自动测试分支均已撤下，默认任务恢复调用 FrameTickCpp。
-  原有 INCLUDE_vTaskDelayUntil=0 问题仍待独立修复，上述周期是设计目标，不能当作实测保证。
+  循环使用 osDelayUntil，上述周期是设计目标，不能当作实测保证。
 - Reader 和控制回调应及时返回，不得在这条共享循环中等待硬件、执行阻塞日志或使用 `Seq::Wait/WaitUntil`。
 - 当前框架注册及应用操作由同一任务执行，不得从 ISR 修改注册表、调用 Monitor 或触发整套系统更新。
 - ISR 和任务之间的多字段数据交接要使用短临界区、双缓冲等明确同步方案；仅加 `volatile` 不能保证整帧一致。

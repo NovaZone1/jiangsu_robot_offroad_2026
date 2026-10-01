@@ -1,8 +1,12 @@
 # jiangsu_robot_offroad_2026
 
 用户已反馈 [8-LP 灰度＋OLED 测试](docs/gray_oled_test.md)检测无误，临时入口已撤下。
-当前恢复原框架入口，传感器未绑定时保持自检等待、四轮禁能；电机自动测试也不会恢复。
-当前 V6 全量构建日志为 `MDK-ARM/build-gray-oled-removed-v6.log`；撤下后的固件需重新烧录。
+电机自动试车、串口调参及专用串口代码已移除，默认任务恢复比赛框架调度。
+上电四轮禁能，不执行自动前进/后退；灰度、OLED 和超声波等待正式集成。
+八组实测 PI 保存在 `FrameComponets/Apps/Inc/MotorSpeedProfiles.hpp`，使用方法见[电机说明](FrameComponets/Mods/MOTOR.md)。
+清理后的 V6 全量构建日志为 `MDK-ARM/build-clean-v6.log`。
+四轮架空正反转 40/60 RPM 调参已完成，32 次重复验证均达标；参数及限制见
+[速度 PI 实测记录](docs/motor_pid_20261001/README.md)。
 
 ## 多人协作
 
@@ -17,11 +21,12 @@ CubeMX/Keil 工程文件及编译所需的 CMSIS 库保留在版本管理中。
 已按 STM32F103ZE 移植 V1_main 相关代码至 `FrameComponets` 的
 `Apps/Bsps/Mods/Sys/Algorithm` 五层目录，
 电机已适配本板 AT8236 和亚博 310 编码减速电机，包含双 PWM、RPM 反馈和速度 PID 接口。
-四轮已绑定：M1 左前、M2 左后、M3 右前、M4 右后，尚未实物验证。
-旧电机自动试验及诊断串口入口已移除，电机驱动及主机回归保留。
+四轮已绑定：M1 左前、M2 左后、M3 右前、M4 右后；用户已反馈正反转和停止现象正确。
+速度 PI 已完成上述架空实测，尚待落地整车验证。临时 USART1 调参入口已删除。
 详见 [电机说明](FrameComponets/Mods/MOTOR.md) 与 [框架说明](FrameComponets/README.md)。
 超声波、灰度与 OLED 适配代码保留供正式集成，当前未启用其硬件入口。
 电机和灰度测试配置均为 0，不应通过重新开启旧测试标志恢复临时入口。
+电机测试及调参开关已移除，当前为框架自检等待和停车。
 
 ## 编译
 
@@ -29,13 +34,13 @@ CubeMX/Keil 工程文件及编译所需的 CMSIS 库保留在版本管理中。
 选择 ARM Compiler V6，执行 Rebuild。
 
 已使用本机 ARM Compiler V6.14.1 完整重编译验证：0 Error(s)，0 Warning(s)。
-本次四轮测试版本的详细日志：`MDK-ARM/build-motor-test-v6.log`。
+清理版本详细日志：`MDK-ARM/build-clean-v6.log`。
 生成文件：
 
 - `MDK-ARM/jiangsu_robot_offroad_2026/jiangsu_robot_offroad_2026.axf`
 - `MDK-ARM/jiangsu_robot_offroad_2026/jiangsu_robot_offroad_2026.hex`
 
-当前仅完成编译和链接验证，尚未烧录到开发板验证运行。
+电机驱动和上述架空 PI 已完成实测；清理后的新固件尚未烧录，比赛自动驾驶尚未实现。
 
 ## V6 兼容性修复
 

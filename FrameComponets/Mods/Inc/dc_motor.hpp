@@ -46,6 +46,7 @@ public:
         float kd = 0;
         float integral_limit = 0.25f; // 占空比单位
         float derivative_filter = 0.9f;
+        float feedback_filter_tau_s = 0; // 0 不滤波；只滤闭环输入，原始 Measure 保留。
     };
 
     DcMotor() = default;
@@ -82,6 +83,7 @@ public:
     Fault GetFault() const;
     float GetDuty() const;
     float GetTargetSpeed() const;
+    float GetFilteredRpm() const;
 
 private:
     bool Register();
@@ -107,6 +109,9 @@ private:
     uint32_t pid_tick_ = 0;
     uint32_t command_timeout_ms_ = 250;
     uint32_t feedback_timeout_ms_ = 50;
+    float feedback_filter_tau_s_ = 0;
+    float filtered_rpm_ = 0;
+    bool filter_valid_ = false;
 };
 
 using MotorPWM = DcMotor;

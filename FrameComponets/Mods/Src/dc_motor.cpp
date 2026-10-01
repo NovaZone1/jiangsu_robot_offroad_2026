@@ -56,6 +56,8 @@ bool DcMotor::Init(const Driver &driver, Mode mode)
     command_timeout_ms_ = 250;
     feedback_timeout_ms_ = 50;
     pid_configured_ = false;
+    feedback_filter_tau_s_ = filtered_rpm_ = 0;
+    filter_valid_ = false;
     speed_pid_.Init(0, 0, 0);
     if (!driver.set_duty || !driver.stop || (mode == Mode::Speed && !driver.read_rpm) ||
         (mode != Mode::Duty && mode != Mode::Speed) || !Register())
@@ -235,12 +237,15 @@ bool DcMotor::ConfigureSpeedPid(const SpeedPidConfig &config)
         config.kp < 0 || config.ki < 0 || config.kd < 0 || !isfinite(config.integral_limit) ||
         config.integral_limit <= 0 || config.integral_limit > 1 ||
         !isfinite(config.derivative_filter) || config.derivative_filter < 0 ||
-        config.derivative_filter > 1)
+        config.derivative_filter > 1 || !isfinite(config.feedback_filter_tau_s) ||
+        config.feedback_filter_tau_s < 0 || config.feedback_filter_tau_s > 0.2f)
     {
         return false;
     }
     speed_pid_.Init(config.kp, config.ki, config.kd);
     speed_pid_.SetLimit(config.integral_limit, 0, config.derivative_filter);
+    feedback_filter_tau_s_ = config.feedback_filter_tau_s;
+    filter_valid_ = false;
     pid_configured_ = config.kp > 0 || config.ki > 0 || config.kd > 0;
     return true;
 }
@@ -267,8 +272,19 @@ bool DcMotor::UpdateFeedback(uint32_t now)
     if (!isfinite(rpm))
     {
         measure_.valid = false;
+        filter_valid_ = false;
         return false;
     }
+    const float dt = (float)(now - measure_.timestamp_ms) * 0.001f;
+    if (!filter_valid_ || feedback_filter_tau_s_ == 0)
+    {
+        filtered_rpm_ = rpm;
+    }
+    else
+    {
+        filtered_rpm_ += dt / (feedback_filter_tau_s_ + dt) * (rpm - filtered_rpm_);
+    }
+    filter_valid_ = true;
     measure_.speed_rpm = rpm;
     measure_.timestamp_ms = now;
     ++measure_.sample_count;
@@ -325,7 +341,7 @@ float DcMotor::Control()
         pid_tick_ = measure_.timestamp_ms;
         speed_pid_.ManualDt((float)elapsed * 0.001f);
         const float previous_integral = speed_pid_.inte_errors;
-        const float output = speed_pid_.Calc(target_speed_, measure_.speed_rpm);
+        const float output = speed_pid_.Calc(target_speed_, filtered_rpm_);
         if (!isfinite(output))
         {
             Trip(Fault::OutputFailure);
@@ -380,4 +396,9 @@ float DcMotor::GetDuty() const
 float DcMotor::GetTargetSpeed() const
 {
     return target_speed_;
+}
+
+float DcMotor::GetFilteredRpm() const
+{
+    return filtered_rpm_;
 }

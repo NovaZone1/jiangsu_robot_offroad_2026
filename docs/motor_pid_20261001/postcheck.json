@@ -1,0 +1,46 @@
+{
+  "purpose": "STOP-only check after all measured trials; no RUN issued",
+  "idle_frames": [
+    [
+      "I",
+      "MOTOR_TUNE_V1",
+      "NONE",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    [
+      "I",
+      "MOTOR_TUNE_V1",
+      "NONE",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    [
+      "I",
+      "MOTOR_TUNE_V1",
+      "NONE",
+      "0",
+      "0",
+      "0",
+      "0"
+    ]
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "command": "HELLO",
+      "sent_at_s": 25370.0848758,
+      "write_ms": 0.09670000144978985
+    },
+    {
+      "sequence": 2,
+      "command": "STOP",
+      "sent_at_s": 25370.091014,
+      "write_ms": 0.0776999986555893
+    }
+  ]
+}

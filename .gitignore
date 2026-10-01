@@ -28,6 +28,7 @@
 
 # 主机测试输出。
 /tests/frame/out/
+__pycache__/
 
 # 编辑器临时文件及系统元数据。
 *.bak

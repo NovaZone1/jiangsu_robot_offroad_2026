@@ -1,0 +1,277 @@
+{
+  "protocol": "MOTOR_TUNE_V1",
+  "simulated": false,
+  "condition": "suspended",
+  "status": "PASS",
+  "error": null,
+  "test_note": "用户已按 RESET，确认继续四轮架空正反转调参；TICKFIX2，PWM上限69%，40/60RPM重复验证。",
+  "profiles": [
+    {
+      "port": 1,
+      "direction": 1,
+      "kp": 0.0012583043666312044,
+      "ki": 0.019440701362781955,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 1003.5426731078902,
+        "approx_tau_s": 0.08099999999999999,
+        "estimated_pwm_intercept": 0.5309966302952502,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 159.56666666666666,
+        "kp": 0.0012583043666312044,
+        "ki": 0.019440701362781955
+      },
+      "validation_trials": [
+        15,
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "port": 1,
+      "direction": -1,
+      "kp": 0.001254813332351302,
+      "ki": 0.019377131555807586,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 1001.9967793880836,
+        "approx_tau_s": 0.08099999999999999,
+        "estimated_pwm_intercept": 0.5288218372332218,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 161.5,
+        "kp": 0.001254813332351302,
+        "ki": 0.019377131555807586
+      },
+      "validation_trials": [
+        33,
+        34,
+        35,
+        36
+      ]
+    },
+    {
+      "port": 2,
+      "direction": 1,
+      "kp": 0.001273799329519659,
+      "ki": 0.01958753890891219,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 947.8260869565214,
+        "approx_tau_s": 0.08099999999999999,
+        "estimated_pwm_intercept": 0.5303399082568807,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 151.32999999999998,
+        "kp": 0.001273799329519659,
+        "ki": 0.01958753890891219
+      },
+      "validation_trials": [
+        51,
+        52,
+        53,
+        54
+      ]
+    },
+    {
+      "port": 2,
+      "direction": -1,
+      "kp": 0.0014552894877873656,
+      "ki": 0.024360652602646873,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 957.0692431561994,
+        "approx_tau_s": 0.071,
+        "estimated_pwm_intercept": 0.5281029713631927,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 154.94666666666666,
+        "kp": 0.0011194534521441273,
+        "ki": 0.019488522082117498
+      },
+      "validation_trials": [
+        69,
+        70,
+        71,
+        72
+      ]
+    },
+    {
+      "port": 3,
+      "direction": 1,
+      "kp": 0.001403675366198717,
+      "ki": 0.024272446775851293,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 942.2866344605474,
+        "approx_tau_s": 0.091,
+        "estimated_pwm_intercept": 0.5243462300909153,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 156.09333333333333,
+        "kp": 0.001403675366198717,
+        "ki": 0.019417957420681035
+      },
+      "validation_trials": [
+        87,
+        88,
+        89,
+        90
+      ]
+    },
+    {
+      "port": 3,
+      "direction": -1,
+      "kp": 0.0014551324146975092,
+      "ki": 0.02435335043147107,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 951.626409017713,
+        "approx_tau_s": 0.071,
+        "estimated_pwm_intercept": 0.5273696527683768,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 154.76333333333332,
+        "kp": 0.0011193326266903916,
+        "ki": 0.019482680345176855
+      },
+      "validation_trials": [
+        105,
+        106,
+        107,
+        108
+      ]
+    },
+    {
+      "port": 4,
+      "direction": 1,
+      "kp": 0.0012595634712060449,
+      "ki": 0.01961489818644607,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 997.7777777777773,
+        "approx_tau_s": 0.061,
+        "estimated_pwm_intercept": 0.536044543429844,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 153.61333333333332,
+        "kp": 0.0009688949778508037,
+        "ki": 0.01961489818644607
+      },
+      "validation_trials": [
+        123,
+        124,
+        125,
+        126
+      ]
+    },
+    {
+      "port": 4,
+      "direction": -1,
+      "kp": 0.0014612159663310255,
+      "ki": 0.02451107835456961,
+      "kd": 0,
+      "integral_limit": 0.69,
+      "duty_limit": 0.69,
+      "deadzone_duty": 0,
+      "feedback_filter_tau_s": 0.03,
+      "targets_rpm": [
+        40.0,
+        60.0
+      ],
+      "qualified": true,
+      "model": {
+        "gain_rpm_per_duty": 997.6811594202894,
+        "approx_tau_s": 0.071,
+        "estimated_pwm_intercept": 0.5358425334108077,
+        "startup_seed_rpm": 40.0,
+        "first_moving_pwm_tested": 0.5864999999999999,
+        "max_measured_rpm": 153.79999999999998,
+        "kp": 0.0011240122817930964,
+        "ki": 0.019608862683655685
+      },
+      "validation_trials": [
+        141,
+        142,
+        143,
+        144
+      ]
+    }
+  ],
+  "requirements": {
+    "steady_error": 0.05,
+    "overshoot": 0.15,
+    "ripple": 0.08,
+    "settling_s": 1.5
+  },
+  "notes": [
+    "Parameters use raw PWM with deadzone_duty=0; do not add old 55.6% compensation.",
+    "Forward/reverse profiles are separate. Results apply only to tested conditions.",
+    "Single-wheel tuning; simultaneous four-wheel and competition load verification remain required."
+  ]
+}

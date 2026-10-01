@@ -1,9 +1,7 @@
 # PWM 减速电机开发说明
 
-> 当前状态：电机与灰度 OLED 临时试验均已撤下，恢复原框架入口，四轮禁能。
-> `MotorTest.hpp/.cpp` 已移至 `tests/frame/fixtures`，仅用于主机回归。
-> 下文关于自动转动、MotorBench 和测试串口的段落是旧试验说明，不是当前入口。
-> 当前操作见 [灰度测试](../../docs/gray_oled_test.md)。电机驱动参数与 API 保留。
+> 当前版本已移除电机自动试车、串口调参和专用串口代码，恢复框架调度，上电四轮禁能。
+> 实测正反转 PI 位于 `Apps/Inc/MotorSpeedProfiles.hpp`，记录见 [速度 PI 实测](../../../docs/motor_pid_20261001/README.md)。
 
 当前适配 YB-DSF01 的 STM32F103ZET6、AT8236 双输入驱动和亚博 310 编码减速电机。
 只参考 [Reactor70 的 MotorDJI 接口](https://github.com/njustup70/Reactor70/blob/master/Mods/inc/motor_dji.hpp)
@@ -23,10 +21,9 @@
 | `Mods/Inc/motor_pwm_driver.hpp`、`Mods/Src/motor_pwm_driver.cpp` | AT8236 双 PWM、滑行停止、换向间隔、编码器输出轴 RPM |
 | `Bsps/Inc/bsp_motor_board.h`、`Bsps/Src/bsp_motor_board.c` | 本板 GPIO、AFIO、20 kHz PWM 和四路编码器定时器初始化 |
 | `Bsps/Src/bsp_tim_pwm.c`、`Bsps/Src/bsp_encoder.c` | 检查 HAL 返回值、双通道更新、计数回绕 |
-| `Bsps/Inc/bsp_motor_console.h`、`Bsps/Src/bsp_motor_console.c` | 测试专用 USART1/PA9 非阻塞日志，板载 CH340，无需 ST-Link |
 | `Apps/Src/MainFrame.cpp` | 四轮与 M1..M4 实际端口绑定，集中配置输出/编码器方向 |
-| `Apps/Inc/MotorTest.hpp`、`Apps/Src/MotorTest.cpp` | 四轮速度试验参数及非阻塞 2/5/5 秒流程 |
-| `Sys/Src/RtosCpp.cpp` | 每 1 ms 调用测试或比赛循环，通过编译开关选择 |
+| `Apps/Inc/MotorSpeedProfiles.hpp` | 八组实测正反转 PI、滤波和限幅，配置时保持禁能 |
+| `Sys/Src/RtosCpp.cpp` | 每 1 ms 调用框架采样、状态机和电机控制 |
 
 上述路径相对于 `FrameComponets`。电机仍由原框架任务控制，没有增加中断回调或第二个控制任务。
 
@@ -62,7 +59,7 @@ M4 的 A/B 与 CH1/CH2 顺序相反，`BspMotorBoard_GetPort()` 用 `encoder_ab_
 `output_reverse` 和 `encoder_reverse` 分别校正输出与反馈：车辆前进时，正占空比和正 RPM 必须一致。
 不要在 PID 内用负增益补偿接线方向。
 
-板级 BSP 已初始化四路所需定时器，四个适配器均已启动零占空比 PWM；电机模块仍保持禁能直到测试入口使能。
+板级 BSP 已初始化四路所需定时器，四个适配器均已启动零占空比 PWM；电机模块保持禁能，只有应用可显式使能。
 TIM1/8 及 TIM2/3/4/5 均保留给电机；TIM6 是 HAL 时间基准，其他成员不能重复占用。
 此次没有改 `.ioc`，电机外设由 `BspMotorBoard_Init()` 初始化。
 CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运行另一套 `MX_TIM*_Init()` 或重映射。
@@ -91,12 +88,10 @@ CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运�
 `SetDuty()` 成功表示接受指令；换向间隔内实际输出仍为零。
 `DcMotor::GetDuty()` 是最近接受的限幅指令，`MotorPwmDriver::GetAppliedDuty()` 是当前实际施加的逻辑占空比。
 
-官方 `MOTOR_IGNORE_PULSE=2000`、PWM 周期计数 3600，对非零输出添加带符号的 2000 死区补偿。
-本板绑定因此设置 `deadzone_duty=2000/3600`：实际幅值为 `min(abs(control)+deadzone_duty, maximum_duty)`。
-零指令始终为零，不添加偏置；负指令对称处理，补偿后的换向仍先滑行。
-适配器通用默认补偿为零，只有本板绑定显式启用；`maximum_duty` 是实际 PWM 的独立上限，当前为 75%。
-因此 `SetDuty()` / PID 返回的控制量在启用补偿后，不等于实际 PWM 占空比。
-`DutyLimSet()` 限制控制量；查看实际输出请使用 `GetAppliedDuty()` 或串口的 `duty1000`。
+本板使用实际 PWM：`deadzone_duty=0`，实际输出上限为 0.69。
+八组实测 PI 基于这一输出方式，不能叠加参考工程的 2000/3600 固定补偿。
+适配器仍保留通用的死区补偿能力，供其他配置使用；本板当前不启用。
+`DutyLimSet()` 限制控制量，实际 PWM 可从 `GetAppliedDuty()` 读取。
 
 驱动适配器检查重复 PWM 通道、共享编码器及 PWM/编码器定时器冲突；同一定时器的不同 PWM 通道组可以共存。
 初始化失败会清零并关闭本次启动的通道；运行故障锁存资源，需显式释放后重建。
@@ -125,111 +120,45 @@ CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运�
 `IsOnline()` 只判断样本新鲜，静止时也有零 RPM 样本；它无法识别编码器断线、堵转或错误 CPR。
 本板没有接入电机电流测量，因此库没有过流或堵转判定。
 
-## 首次实物测试
+## 正式速度 PI 配置
 
-**当前 `Bsps/Inc/frame_config.h` 的 `FRAME_MOTOR_TEST_ENABLED=1`，烧录/复位后会自动转动。**
-原默认任务每毫秒调用 `MotorBench.Update()`，不运行比赛应用和传感器自检，不需要超声波/灰度假样本。
-这是对原任务的分支选择，没有另加任务；不能同时运行两套控制。
+`Apps/Inc/MotorSpeedProfiles.hpp` 按 M1～M4 保存前进、后退共八组实测参数。
+本板初始化四轮驱动后，分别调用 `MotorSpeedProfiles::Apply(motor, port, false)` 配置前进参数，
+保持禁能，没有自动目标或定时前进/后退流程。参数完整记录见 [实测数据](../../../docs/motor_pid_20261001/README.md)。
 
-| 从测试开始计时 | 阶段 | 四轮目标 |
-| --- | --- | --- |
-| 0–2 秒 | 等待四路新鲜编码器反馈 | 禁能、输出为零 |
-| 2–7 秒 | 前进 | 每轮 +60 RPM |
-| 7–12 秒 | 后退 | 每轮 -60 RPM，先清除前进积分，硬件保留 2 ms 换向间隔 |
-| 12 秒以后 | 完成 | 四轮禁能、双低滑行，保持停止指令 |
+- PI 输入为输出轴 RPM，积分时间单位为秒，输出为实际 PWM 占空比；Kd=0。
+- 输出限幅和积分限幅均为 0.69，反馈低通时间常数 0.03 秒。
+- `GetMeasure().speed_rpm` 保留原始测速；`GetFilteredRpm()` 返回闭环使用的滤波值。
+- 通用库的 `feedback_filter_tau_s=0` 表示不滤波，本板参数显式设置为 0.03 秒。
+- 当前目标限幅为 160 RPM，只是软件命令边界。验证范围仍为架空 40/60 RPM，负载及更高转速待验证。
+- `Apply` 只接受就绪、禁能的电机和端口 1～4，清除旧目标和积分，配置后不自动使能。
 
-每次上电只运行一次，完成或故障后不自动重试；复位会重新执行。
-5 秒表示目标下发阶段的长度，实际加减速需要时间；滑行停止后车轮不会保证立即静止。
-先架空四轮，并接好四路电机电源和编码器再复位。
-第一次观察每轮的物理前进方向和正负 RPM，方向不符时断开电机电源，分别修正 `MainFrame.cpp` 的方向数组。
-正确符号应满足：目标为正、物理轮子向车辆前进方向转动、反馈 RPM 为正；不能仅凭 PID 没有报错判定方向正确。
+上层需要后退参数时，先提交停车并等车轮停稳，再禁能并切换。配置示例：
 
-任一路初始化/使能/输出失败、反馈过期、持续无计数或方向错误，都会禁能四轮。
-无计数检测：占空比指令绝对值至少 10%，连续 1.5 秒没有达到 3 RPM 的新样本。
-方向检测：每个行驶阶段先留 500 ms 加减速时间，之后连续三个新样本与目标方向相反则停止。
-两项检测是本次试验的辅助检查，不能代替电流保护或证明传感器线路正常。
-运行阶段如果控制调用间隔达到 50 ms，恢复调用时停止四轮，不刷新目标掩盖超时。
-该检查依赖任务继续运行；调试器暂停 CPU 时不能保证输出自动归零，电机有电时不要打断点暂停控制循环。
-
-Keil Watch 中可展开 `MotorBench` 查看 `status_`：
-
-- `phase`：等待反馈、前进、后退、完成或失败。
-- `failure`：配置、反馈、使能、输出/模块故障、控制超时、方向错误或无计数。
-- `failed_port`：出错端口 1..4，0 表示整体错误；`elapsed_ms` 为当前阶段计时。
-- `Motor1`..`Motor4` 的 `measure_`：输出轴 RPM、时间戳、样本编号；`fault_` 为模块具体故障。
-- `Motor1Driver`..`Motor4Driver` 的 `applied_duty_`：当前实际施加的逻辑占空比。
-
-若提前停止，先读取以上状态，核对供电、计数、方向和连接；不要直接增大 PID 试图绕过错误。
-完成架空测试后，再做负载实测和逐轮调参。
-恢复比赛模式时将 `FRAME_MOTOR_TEST_ENABLED` 改为 0 后重新编译；比赛应用仍保持停车，四轮策略尚待集成。
-
-## 当前试验 PID 与后续调参
-
-速度环已经复用 `Algorithm/PidGeneral`，有占空比限幅和饱和时停止继续积分的处理。
-通用库默认增益仍为零；测试入口根据用户要求显式使用以下试验值，各轮状态互不共享：
-
-| 参数 | 试验初值 |
-| --- | --- |
-| Kp / Ki / Kd | 0.0008 / 0.005 / 0 |
-| 目标转速 / 目标限幅 | ±60 RPM / ±80 RPM |
-| PID 控制量限幅 / 积分项限幅 | ±0.15 / ±0.10 |
-| 实际 PWM 限幅 | 本测试约 ±0.7056；驱动硬上限 ±0.75 |
-| 反馈周期 / 新鲜度 / 命令超时 | 10 ms / 50 ms / 250 ms |
-
-参数位于 `Apps/Inc/MotorTest.hpp` 的 `Config`。
-这些增益是保守的试验起点，不来自电机厂家、不代表实测调参结果；Kd 暂为零，避免首次测试放大计数量化噪声。
-静止时 60 RPM 误差对应约 4.8% 比例控制量，加 55.56% 补偿后实际 PWM 约 60.36%。
-上一版未添加官方死区补偿，30% 实际输出上限低于参考代码的 55.56% 补偿基值，已修正。
-官方增量 PID 使用 mm/s 误差、PWM 计数和固定 10 ms 周期，不能把其 0.8/0.06/0.5 原值直接填入本库。
-本库使用 RPM 误差和秒、归一化控制量；当前参数只是重新选择的试验值，不保证负载下能达到目标。
-主机测试使用简化惯性模型，仅验证程序和阶段流程，不能证明真实电机闭环稳定或速度准确。
-速度模式使能要求：有编码器、新鲜反馈、已设置速度上限，以及至少一个非零的 PID 增益。
-增益单位基于 RPM 误差和秒：输出为归一化占空比，积分限幅也采用占空比单位。
-
-后续调整参数时，在禁能状态调用 `ConfigureSpeedPid()` 和 `SpeedLimSet()`，
-调用 `SwitchMode(Mode::Speed)`，继续轮询至 `IsOnline()` 为真，再 `Enable()` 并周期性 `SetSpeed()`。
-方向符号必须先验证一致；切换模式/清除故障不会自动恢复目标。
-重新 `Init()` 会清除原设备的 PID 配置、速度上限、占空比限制和超时配置，需要重新设置。
-
-## 软件验证
-
-主机测试覆盖实际 PWM/编码器 BSP、换向等待、tick/计数回绕、独立通道、资源冲突、释放重绑、
-HAL 启动失败、默认禁能、指令超时、反馈过期、非有限输入、PID 使能条件和饱和积分处理。
-四轮试验另覆盖阶段计时、全部轮子限幅、只运行一次、任一轮故障使四轮停止、方向错误、无计数及控制间隔超时。
-运行 `tests/frame/Run-Tests.ps1`；正常固件使用 Keil ARM Compiler V6 Rebuild。
-本次编译日志为 `MDK-ARM/build-motor-test-v6.log`，生成文件仍在 `MDK-ARM/jiangsu_robot_offroad_2026/`。
-软件测试不代替板上 PWM 波形、实际接线、编码器精度、实时性或电机负载验证。
-
-## 没有 ST-Link 时通过串口排查
-
-FlyMCU 下载后退出或释放 COM 端口，再用串口助手打开同一个板载 CH340 串口，设置 **115200、8N1、无流控、文本接收**。
-先架空四轮，打开电机电源，再按板上的 RESET。串口助手不要启用自动下载或持续控制 DTR/RTS。
-亚博的 [下载说明](https://www.yahboom.net/public/upload/upload-html/1740658131/Program%20download%20and%20simulation.html)
-要求 FlyMCU 使用“DTR 低电平复位，RTS 高电平进入 BootLoader”，下载完成后按 RESET 运行。
-也可检查 FlyMCU 的“编程后执行”；不要只依据写入成功判断用户程序已开始运行。
-
-串口日志持续重复状态，即使测试已经失败也能看到，不需要在 12 秒内抢读：
-
-```text
-BOOT MOTOR_TEST_4W_DZ2000_UART1_115200 waiting=2s forward=5s reverse=5s
-HW step=READY port=1
-...
-TEST phase=WAIT failure=NONE port=0 ms=... en=0 online=15 rpm10=0,0,0,0 duty1000=0,0,0,0
+```cpp
+Motor1.Disable();
+if (!MotorSpeedProfiles::Apply(Motor1, 1, true))
+{
+    System.Stop(true);
+    return;
+}
+// 后续由应用确认反馈新鲜，再显式 Enable，周期性 SetSpeed(负目标)。
 ```
 
-`rpm10` 为 RPM 乘 10，`duty1000` 为补偿后的实际占空比乘 1000，按 M1..M4 排列。
-`en` 和 `online` 是四路位图：15 表示四路都使能/反馈都新鲜，0 表示全部禁能/没有新鲜反馈。
-输出使用固定容量队列和 TXE 非阻塞轮询；队列满时丢弃整行，不能拖慢电机任务。
-USART1/PA9 只在电机测试模式初始化，不能同时绑定其他 UART1 驱动。
+不要每次更新目标都 Apply；会反复清积分，破坏速度环。
+通用库默认增益为零，其他板级适配须自行配置；不能直接采用旧试验的猜测增益。
+各轮反馈、PID 和故障独立，`MainFrame` 的系统停车回调禁能四轮。
+临时试验中的方向/180 RPM 超速/无计数检测随试验入口撤下，正式控制应按比赛需要实现整车运行监测。
+现有库仍保留命令过期、反馈过期、非法输入和输出失败停机，不含电流保护。
 
-| 日志 | 优先排查 |
-| --- | --- |
-| 完全没有 `BOOT` 或 `TEST` | COM/波特率、HEX 是否为本次版本、RESET/BOOT0 状态，用户程序或任务是否启动 |
-| `HW step=...FAILED` | 板级定时器或具体端口初始化失败 |
-| `failure=SETUP/ENABLE` | 对应端口未就绪、PID 配置或使能条件失败 |
-| `failure=FEEDBACK` | 反馈采集失败/过期；零转速也会交付有效样本，不能把它直接解释为编码器断线 |
-| `failure=NO_MOTION` | 电机电源/开关、接线、驱动力或编码器不产生计数；四轮因此停止 |
-| `failure=WRONG_DIRECTION` | 输出或编码器符号不匹配，查看 `port` 后单独校正 |
-| `phase=FORWARD` 且 PWM 非零，但轮子不转 | 检查 VM 电源、驱动输出和电机连接；不能仅凭 MCU 串口/PWM 数据证明驱动功率级有电 |
+## 当前应用与验证
 
-请保存从复位开始的日志后再调整参数；不要为排查而删除全部停机保护。
+`RobotSystemCpp()` 只运行 `FrameTickCpp()`；没有测试分支，也不初始化电机专用 USART1。
+`OffroadApp::Control()` 仍停车，传感器采集和比赛策略尚待正式集成；上电或复位不会自动试跑。
+FlyMCU 下载仍使用原板载串口，当前固件不再输出 BOOT/TEST 调试日志。
+
+主机回归覆盖双 PWM、换向等待、编码器回绕、资源冲突、HAL 失败、默认禁能、指令/反馈超时、
+非有限输入、PID 饱和处理，以及实测参数配置和滤波保留原始测速。
+运行 `tests/frame/Run-Tests.ps1`；固件使用 Keil ARM Compiler V6 Rebuild。
+清理版本构建日志为 `MDK-ARM/build-clean-v6.log`，AXF/HEX 仍在正常 Keil 输出目录。
+本次软件验证不能替代落地、四轮共同负载和比赛地面验证。
