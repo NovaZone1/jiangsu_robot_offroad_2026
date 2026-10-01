@@ -1,5 +1,10 @@
 # PWM 减速电机开发说明
 
+> 当前状态：电机与灰度 OLED 临时试验均已撤下，恢复原框架入口，四轮禁能。
+> `MotorTest.hpp/.cpp` 已移至 `tests/frame/fixtures`，仅用于主机回归。
+> 下文关于自动转动、MotorBench 和测试串口的段落是旧试验说明，不是当前入口。
+> 当前操作见 [灰度测试](../../docs/gray_oled_test.md)。电机驱动参数与 API 保留。
+
 当前适配 YB-DSF01 的 STM32F103ZET6、AT8236 双输入驱动和亚博 310 编码减速电机。
 只参考 [Reactor70 的 MotorDJI 接口](https://github.com/njustup70/Reactor70/blob/master/Mods/inc/motor_dji.hpp)
 （头文件 Git blob `278b63dcd0ccd9d8976b29a4d58766fb354f1f2d`），驱动和 PWM 调速实现为本项目编写。

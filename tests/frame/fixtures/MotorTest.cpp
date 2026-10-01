@@ -1,4 +1,5 @@
 #include "MotorTest.hpp"
+// Host regression fixture; not a firmware entry point.
 
 #include "stm32f1xx_hal.h"
 #include <math.h>

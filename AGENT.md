@@ -11,15 +11,16 @@
 - 参考框架为 V1_main，原 F407 代码已经适配 F103；原 `Libs` 在本工程对应 `Bsps`。
 - 四路电机已实现 AT8236 双 PWM、310 编码器 RPM 和独立速度 PID；尚未实物验证。
 - M1 左前、M2 左后、M3 右前、M4 右后，方向设置集中在 `MainFrame.cpp`。
-- 当前 `FRAME_MOTOR_TEST_ENABLED=1`：上电等待 2 秒，然后 +60 RPM 5 秒、-60 RPM 5 秒，最后禁能四轮。
-  测试初值 Kp=0.0008、Ki=0.005、Kd=0，控制量限幅 15%，叠加官方 2000/3600 死区补偿后实际上限约 70.6%。
-  驱动另外限制实际 PWM 不超过 75%；这些 PID 值仍待实测。
-- 超声波和灰度仍待硬件驱动及绑定；恢复比赛模式后仍等待自检。
+- 用户已反馈灰度 OLED 测试检测无误；临时入口已撤下，恢复原框架调度。
+  `FRAME_GRAY_OLED_TEST_ENABLED` 和 `FRAME_MOTOR_TEST_ENABLED` 均保留为 0。
+  MotorTest 与 GrayOledTest 仅保留在 `tests/frame/fixtures` 做主机回归，不参与固件构建。
+- 灰度、OLED 可复用驱动保留但未加入当前固件；灰度和超声波尚未绑定比赛接口，当前保持自检等待和停车。
+  已确认的接线与测试记录见 [灰度 OLED 测试记录](docs/gray_oled_test.md)。
 - `OffroadApp::Control()` 目前始终停车，尚未实现比赛自动驾驶。
 - 当前版本已通过 V6 完整编译和主机回归测试；后续修改须重新验证，编译通过不代表实车验证通过。
 
 电机资源依据用户提供的 YB-DSF01 原理图和亚博资料确定，详见 [电机说明](FrameComponets/Mods/MOTOR.md)。
-超声波和灰度的具体采集方式仍需各自负责人确认，不得根据参考 F407 工程直接填入。
+灰度已确认使用 8-LP 八路 GPIO，接线见资源表；传感器正式接入需协调，不得根据参考 F407 工程直接填入。
 
 ## 2. 分工及修改范围
 
@@ -56,9 +57,10 @@
 | 左后 M2 | PC8/PC9，TIM8 CH3/CH4；PA15/PB3，TIM2 CH1/CH2 | 电机 | 310，减速比 20，13 线四倍频，输出轴 1040 计数/圈 |
 | 右前 M3 | PE9/PE11，TIM1 CH1/CH2；PA0/PA1，TIM5 CH1/CH2 | 电机 | 官方输出极性：左侧反向、右侧不反向；反馈左正右负 |
 | 右后 M4 | PE13/PE14，TIM1 CH3/CH4；PB5/PB4，TIM3 CH2/CH1 | 电机 | 方向表直接针对 TIM 原始计数，已涵盖实际 A/B 布线 |
-| 测试诊断串口 | USART1 TX，PA9，板载 CH340 | 电机测试 | 115200 8N1，仅测试模式启用；非阻塞单任务轮询，不新增中断 |
+| 测试诊断串口 | USART1 TX，PA9，板载 CH340 | 电机测试 | 旧测试入口已撤下，当前固件不初始化此诊断串口 |
 | 超声波 | 待定 | 超声波 | 写明型号及触发/回波或 UART 协议 |
-| 灰度阵列 | 待定 | 灰度 | 写明型号、通道数、通道顺序及 GPIO/ADC/UART 方式 |
+| 灰度阵列 | x1～x8：PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1 | 灰度 | 用户确认接线；8-LP 数字输入，OLED 按 x1～x8 显示；车体左右方向待安装确认 |
+| 原厂 OLED | I2C1 PB6/PB7，0x3C，128×32 | 显示 | 诊断已撤下，驱动保留；重用时保留 IRQ 唯一所有者 |
 | 状态 LED | 待定 | 三人协商 | 写明引脚和有效电平 |
 | TIM6 | HAL 时间基准，已占用 | 共享 | 不得用于电机、编码器或超声波 |
 
@@ -77,10 +79,9 @@ JTAG 已关闭以使用 PA15/PB3/PB4，SWD 保留。其他模块不得改回相�
 `Init()` / `Bind()` 默认禁能；占空比模式需显式 `Enable()`。
 `Neutral()` / `Stop()` 清空目标并滑行，保留使能；`Disable()` 同时禁能。
 `FrameTickCpp()` 每 1 ms 调用批量控制，命令默认 250 ms 过期。
-用户已要求本次直接使用试验 PID；参数集中在 `Apps/Inc/MotorTest.hpp` 的 `Config`，不代表完成调参。
-库默认增益仍为零，测试入口显式配置四路并在反馈就绪后使能。
-独立测试循环通过编译开关替代比赛循环，不能让两个任务同时写输出。
-测试完成或故障后保持禁能，不自动重试；若方向错误或持续无计数则停止全部电机。
+旧电机试验参数及流程仅保留在 `tests/frame/fixtures/MotorTest.hpp/.cpp`。
+库默认增益仍为零；当前入口不配置速度 PID、不使能电机。
+临时诊断循环已撤下，不能让两个任务同时写输出。
 
 现有 `DcMotor::Driver` 通过回调隔离实际驱动板：
 
@@ -164,7 +165,7 @@ bool ReadGray(void *context, GraySensor::Sample *sample);
 
 ```cpp
 // Motor1..4 已在 BindHardware() 中初始化并绑定，上电保持禁能。
-// 测试入口在等待反馈后显式使能，比赛模式则不自动使能。
+// 当前入口不自动使能电机，灰度诊断已撤下。
 // 以下采集上下文及回调由传感器负责人提供，仍为示意名称。
 RangeSensor.Bind(&range_context, ReadRange);
 GrayArray.Bind(&gray_context, ReadGray);
@@ -177,8 +178,8 @@ GrayArray.Bind(&gray_context, ReadGray);
 - 现有基础周期为 1 ms：更新 DWT、传感器采样，随后按分频更新系统，最后执行控制。
   应用、系统、状态机和动作的周期为 5 ms；状态机/动作仅在 WORKING 时运行。
   最后调用 `DcMotor::ControlAllMotors()`，禁能状态也采集编码器。
-  当前电机测试模式改由 `MotorBench.Update()` 单独控制四轮，不执行比赛/传感器循环。
-  恢复比赛调度需把 `Bsps/Inc/frame_config.h` 的 `FRAME_MOTOR_TEST_ENABLED` 改为 0 并重新编译。
+  灰度显示和电机自动测试分支均已撤下，默认任务恢复调用 FrameTickCpp。
+  原有 INCLUDE_vTaskDelayUntil=0 问题仍待独立修复，上述周期是设计目标，不能当作实测保证。
 - Reader 和控制回调应及时返回，不得在这条共享循环中等待硬件、执行阻塞日志或使用 `Seq::Wait/WaitUntil`。
 - 当前框架注册及应用操作由同一任务执行，不得从 ISR 修改注册表、调用 Monitor 或触发整套系统更新。
 - ISR 和任务之间的多字段数据交接要使用短临界区、双缓冲等明确同步方案；仅加 `volatile` 不能保证整帧一致。

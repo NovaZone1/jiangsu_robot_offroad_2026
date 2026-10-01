@@ -2,7 +2,7 @@
 
 #include "dc_motor.hpp"
 
-// 独立四轮试验；由原默认任务调用，不能与比赛控制循环并行运行。
+// Historical four-wheel bench sequence, retained only for host regression tests.
 class MotorTest
 {
 public:

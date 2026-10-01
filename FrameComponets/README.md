@@ -1,5 +1,9 @@
 # STM32F103ZE 越野比赛框架
 
+> 用户已反馈 [灰度＋OLED 诊断](../docs/gray_oled_test.md)检测无误，临时入口及编译项已撤下。
+> MotorTest 和 GrayOledTest 均只保留在主机测试 fixtures；当前运行原框架、自检等待，电机保持禁能。
+> 灰度、OLED、超声波适配源码保留供正式集成，目前没有启用这些硬件入口。
+
 移植参考为 [ZWJ_GeneralFramework 的 V1_main 分支](https://github.com/zwj051029/ZWJ_GeneralFramework/tree/V1_main)，
 固定提交 `e403922005831e20a1f764486dffbcb64c216bb5`。
 本地 `Resource/other_code/ZWJ_GeneralFramework` 与该提交一致；参考工程和比赛文件未修改。
@@ -28,7 +32,7 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Sys | StateCore、Action | 移植状态图、状态切换、动作超时/取消及非阻塞等待；修正当前状态复制、空图和空指针问题 |
 | Sys | Application、System、Monitor、RtosCpp、SysDefs | 应用生命周期独立于系统调度；保留注册、自检、日志和任务桥接，使用 F103 比赛配置和单线程框架调度 |
 | Apps | MainFrame、OffroadApp | 板级模块绑定入口、越野应用及比赛策略的扩展位置 |
-| Apps | MotorTest | 独立四轮试验：等待 2 秒、前进 5 秒、后退 5 秒、禁能停止；当前已启用 |
+| tests/frame/fixtures | MotorTest、GrayOledTest | 已撤下的临时试验，仅用于主机回归，不参与固件编译 |
 
 `Libs → Bsps`；Algorithm 为独立层，算法头文件位于 `Algorithm/Inc`，
 源文件位于 `Algorithm/Src`，原 Bsps 下的三个算法已经迁回 Algorithm，避免重复编译。
@@ -46,13 +50,12 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
   需要按型号补充 GPIO/ADC/串口读取、白线与背景标定、通道位置。
   `GetLineError()` 只计算已标定数据的加权偏差，不代替实际采集驱动。
 
-电机已有实际硬件驱动，超声波和灰度仍只有接口、参数检查及失效处理。
+电机已有实际硬件驱动；超声波、灰度的独立适配也已保留，但尚未正式绑定。
 `Apps/Src/MainFrame.cpp` 集中绑定四轮：M1 左前、M2 左后、M3 右前、M4 右后。
-底层初始化保持禁能，当前测试入口显式配置 PID，等待反馈后自动使能。
-`FRAME_MOTOR_TEST_ENABLED=1` 使默认任务只运行 `MotorBench`，不执行比赛/传感器循环。
-设为 0 后恢复比赛调度；传感器未绑定时仍保持自检等待。
+底层初始化保持禁能，两个临时试验入口均已撤下，默认任务运行原框架。
+传感器未绑定时保持自检等待，不会自动开始循迹或电机试验。
 方向和非零 PWM 死区补偿已对照用户提供的官方 `car_tracking`：左侧反向输出、右侧反向反馈。
-实际接线仍需架空验证；测试 USART1/PA9 通过板载 CH340 输出启动和故障日志。
+电机实际接线仍需验证；旧测试 USART1/PA9 日志入口已撤下。
 绑定的驱动、GPIO/UART 注册对象、应用和状态图必须保持静态或全程有效的生命周期。
 初始化/注册只能在框架任务开始前完成，或由同一个框架任务执行。
 

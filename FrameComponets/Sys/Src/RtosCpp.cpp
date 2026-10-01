@@ -4,7 +4,6 @@
 #include "Action.hpp"
 #include "MainFrame.hpp"
 #include "bsp_dwt.h"
-#include "bsp_motor_console.h"
 #include "cmsis_os.h"
 
 void MainInitCpp(void)
@@ -36,19 +35,9 @@ void FrameTickCpp(void)
 void RobotSystemCpp(void)
 {
     uint32_t wake = osKernelSysTick();
-#if FRAME_MOTOR_TEST_ENABLED
-    MotorBench.Start();
-#endif
     for (;;)
     {
-#if FRAME_MOTOR_TEST_ENABLED
-        BspDwt_CntUpdate();
-        MotorBench.Update();
-        MotorTestLogCpp();
-        BspMotorConsole_Pump();
-#else
         FrameTickCpp();
-#endif
         osDelayUntil(&wake, FRAME_CONTROL_PERIOD_MS);
     }
 }

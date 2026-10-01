@@ -1,5 +1,9 @@
 # Yahboom 8-LP：八路 GPIO 灰度驱动
 
+> 更新：用户已确认下文参考引脚，并反馈 OLED 测试检测无误；临时显示入口现已撤下。
+> 记录见 [灰度 OLED 测试](../../docs/gray_oled_test.md)。下文为初次驱动交付记录。
+> 可复用驱动与主机测试保留；尚未正式绑定比赛 GrayArray，原公共接口保持不变。
+
 ## 交付边界
 
 面向当前 STM32F103ZET6 / STM32 HAL / ARM Compiler V6 工程，使用 C++11，复用 C GPIO BSP。
