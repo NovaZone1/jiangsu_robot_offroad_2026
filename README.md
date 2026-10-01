@@ -12,9 +12,15 @@ CubeMX/Keil 工程文件及编译所需的 CMSIS 库保留在版本管理中。
 
 已按 STM32F103ZE 移植 V1_main 相关代码至 `FrameComponets` 的
 `Apps/Bsps/Mods/Sys/Algorithm` 五层目录，
-并预留直流减速电机、超声波和灰度模块。详见 [框架说明](FrameComponets/README.md)。
-框架版本的完整 V6 重编译日志为 `MDK-ARM/build-frame-v6.log`。
-当前未绑定实际驱动和引脚，默认保持停车，比赛控制策略仍需完成。
+电机已适配本板 AT8236 和亚博 310 编码减速电机，包含双 PWM、RPM 反馈和速度 PID 接口。
+四轮已绑定：M1 左前、M2 左后、M3 右前、M4 右后，尚未实物验证。
+**当前固件是电机测试模式，烧录/复位后会自动运行：等待 2 秒 → 前进 5 秒 → 后退 5 秒 → 禁能停止。**
+目标 ±60 RPM，试验 PID 为 Kp=0.0008、Ki=0.005、Kd=0。
+已对照用户提供的官方 `car_tracking` 修正方向及 2000/3600 死区补偿，测试实际 PWM 上限约 70.6%。
+首次测试先架空四轮；板载串口输出 115200 8N1 的初始化和故障日志，无需 ST-Link。
+详见 [电机说明](FrameComponets/Mods/MOTOR.md) 与 [框架说明](FrameComponets/README.md)。
+超声波和灰度硬件驱动仍待完成。测试模式不执行比赛控制，也不等待传感器自检。
+恢复比赛调度时，将 `FrameComponets/Bsps/Inc/frame_config.h` 的 `FRAME_MOTOR_TEST_ENABLED` 改为 0 并重新编译。
 
 ## 编译
 
@@ -22,7 +28,7 @@ CubeMX/Keil 工程文件及编译所需的 CMSIS 库保留在版本管理中。
 选择 ARM Compiler V6，执行 Rebuild。
 
 已使用本机 ARM Compiler V6.14.1 完整重编译验证：0 Error(s)，0 Warning(s)。
-详细日志：`MDK-ARM/build-v6.log`。
+本次四轮测试版本的详细日志：`MDK-ARM/build-motor-test-v6.log`。
 生成文件：
 
 - `MDK-ARM/jiangsu_robot_offroad_2026/jiangsu_robot_offroad_2026.axf`

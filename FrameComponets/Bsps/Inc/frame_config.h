@@ -8,3 +8,7 @@
 #define FRAME_CONTROL_PERIOD_MS 1U
 #define FRAME_SYSTEM_PERIOD_MS 5U
 #define FRAME_REQUIRED_LAPS 3U
+#define FRAME_MAX_MOTORS 8U
+
+// 当前固件执行一次四轮速度测试；恢复比赛调度时改为 0 后重新编译。
+#define FRAME_MOTOR_TEST_ENABLED 1U
