@@ -1,0 +1,47 @@
+diff --git a/FrameComponets/Apps/Src/MainFrame.cpp b/FrameComponets/Apps/Src/MainFrame.cpp
+--- a/FrameComponets/Apps/Src/MainFrame.cpp
++++ b/FrameComponets/Apps/Src/MainFrame.cpp
+@@ -1,4 +1,5 @@
+ #include "MainFrame.hpp"
++#include "ultrasonic_factory.hpp"
+ 
+ DcMotor LeftMotor;
+ DcMotor RightMotor;
+@@ -11,6 +12,10 @@
+ {
+     void BindHardware()
+     {
++        if (!FactoryUltrasonic::Init(RangeSensor))
++        {
++            System.monitor.LogError("Factory ultrasonic initialization failed");
++        }
+         // TODO：在 CubeMX 外设初始化后绑定实际驱动和引脚。
+         // LeftMotor.Bind(...);
+         // RightMotor.Bind(...);
+diff --git a/MDK-ARM/jiangsu_robot_offroad_2026.uvprojx b/MDK-ARM/jiangsu_robot_offroad_2026.uvprojx
+--- a/MDK-ARM/jiangsu_robot_offroad_2026.uvprojx
++++ b/MDK-ARM/jiangsu_robot_offroad_2026.uvprojx
+@@ -705,6 +705,11 @@
+               <FileName>bsp_uart.c</FileName>
+               <FileType>1</FileType>
+               <FilePath>../FrameComponets/Bsps/Src/bsp_uart.c</FilePath>
++            </File>
++            <File>
++              <FileName>bsp_ultrasonic_echo.c</FileName>
++              <FileType>1</FileType>
++              <FilePath>../FrameComponets/Bsps/Src/bsp_ultrasonic_echo.c</FilePath>
+             </File>
+           </Files>
+         </Group>
+@@ -740,6 +745,11 @@
+               <FileName>ultrasonic.cpp</FileName>
+               <FileType>8</FileType>
+               <FilePath>../FrameComponets/Mods/Src/ultrasonic.cpp</FilePath>
++            </File>
++            <File>
++              <FileName>ultrasonic_factory.cpp</FileName>
++              <FileType>8</FileType>
++              <FilePath>../FrameComponets/Mods/Src/ultrasonic_factory.cpp</FilePath>
+             </File>
+           </Files>
+         </Group>
