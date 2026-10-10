@@ -1,9 +1,9 @@
 # PWM 减速电机开发说明
 
-> 当前版本已移除电机自动试车、串口调参和专用串口代码，恢复框架调度，上电四轮禁能。
-> 实测正反转 PI 位于 `Apps/Inc/MotorSpeedProfiles.hpp`，记录见 [速度 PI 实测](../../../docs/motor_pid_20261001/README.md)。
+> 当前适配 520、30:1 电机，用户已确认四路单轮测试正常。临时入口已清理，正式保护保留，上电禁能等待应用启动。
+> 初始 PI 位于 `Apps/Inc/MotorSpeedProfiles.hpp`；旧 [310 实测记录](../../../docs/motor_pid_20261001/README.md) 仅作历史资料。
 
-当前适配 YB-DSF01 的 STM32F103ZET6、AT8236 双输入驱动和亚博 310 编码减速电机。
+当前适配 YB-DSF01 的 STM32F103ZET6、AT8236 双输入驱动和 520 编码减速电机。
 只参考 [Reactor70 的 MotorDJI 接口](https://github.com/njustup70/Reactor70/blob/master/Mods/inc/motor_dji.hpp)
 （头文件 Git blob `278b63dcd0ccd9d8976b29a4d58766fb354f1f2d`），驱动和 PWM 调速实现为本项目编写。
 没有移植 CAN、DJI 电流控制或位置控制。
@@ -22,18 +22,21 @@
 | `Bsps/Inc/bsp_motor_board.h`、`Bsps/Src/bsp_motor_board.c` | 本板 GPIO、AFIO、20 kHz PWM 和四路编码器定时器初始化 |
 | `Bsps/Src/bsp_tim_pwm.c`、`Bsps/Src/bsp_encoder.c` | 检查 HAL 返回值、双通道更新、计数回绕 |
 | `Apps/Src/MainFrame.cpp` | 四轮与 M1..M4 实际端口绑定，集中配置输出/编码器方向 |
-| `Apps/Inc/MotorSpeedProfiles.hpp` | 八组实测正反转 PI、滤波和限幅，配置时保持禁能 |
+| `Apps/Inc/MotorSpeedProfiles.hpp` | 520 编码器参数、初始正反转 PI、滤波和限幅，配置时保持禁能 |
+| `Apps/Inc/MotorProtection.hpp`、`Apps/Src/MotorProtection.cpp` | 四轮方向、无转速、超速、故障锁定和停稳等待；不产生运动指令 |
 | `Sys/Src/RtosCpp.cpp` | 每 1 ms 调用框架采样、状态机和电机控制 |
 
 上述路径相对于 `FrameComponets`。电机仍由原框架任务控制，没有增加中断回调或第二个控制任务。
 
 ## 参数和接线
 
-根据用户提供的 `Resource/原理图.pdf` 及
-[亚博官方电机控制资料](https://www.yahboom.com/build?id=8924&cid=617)：
+板卡接线沿用用户提供的 `Resource/原理图.pdf`；新电机参数采用用户提供的 520 参数图片：
 
-- 电机电源为 7.4 V，编码器供电范围 3.3–5 V；接到 STM32 的信号电平仍需按板卡接线确认。
-- 310 电机减速比 20、编码器 13 线；本实现使用 A/B 双边沿四倍频，输出轴每圈有效计数为 `20 × 13 × 4 = 1040`。
+- 520 标称电压 12 V、空载 320 RPM、额定 180 RPM；额定电流 ≤1 A，堵转电流 3.5 A。
+  编码器供电为 3.3–5 V。原车电池曾使用 7.4 V，此电压下的可达转速须实测；
+  调整电池前需核对整块板卡的供电规格，不能根据电机标称电压直接替换。
+- 减速比 30、编码器 11 线；A/B 双边沿四倍频，输出轴每圈有效计数为 `30 × 11 × 4 = 1320`。
+  `MainFrame` 显式传入此参数，通用适配器默认值也更新为 1320；旧 310 测试显式使用 1040。
 - PWM 20 kHz；当前 72 MHz 定时器时钟下 `PSC=0`、`ARR=3599`，完全导通对应 `CCR=3600`。
 - 编码器 `PSC=0`、`ARR=65535`、`TIM_ENCODERMODE_TI12`，输入数字滤波为 6。
 
@@ -46,15 +49,16 @@
 
 TIM1 全重映射到 PE，引脚 PA15/PB3/PB4 需要关闭 JTAG，代码保留 SWD。
 M4 的 A/B 与 CH1/CH2 顺序相反，`BspMotorBoard_GetPort()` 用 `encoder_ab_swapped` 标记。
-当前方向表已直接对照官方使用相同 TIM 原始计数的符号，包含实际布线；不再额外异或该标记。
+方向表直接针对 TIM 原始计数，包含实际布线；不再额外异或该标记。
 
 根据用户确认的接线：`Motor1`/`LeftFrontMotor` 为 M1 左前，`Motor2`/`LeftRearMotor` 为 M2 左后，
 `Motor3`/`RightFrontMotor` 为 M3 右前，`Motor4`/`RightRearMotor` 为 M4 右后。
 旧 `LeftMotor`、`RightMotor` 名称分别引用左前 M1、右前 M3，不创建额外实例。
 四路各有自己的适配器、反馈和 PID 状态。
-`MainFrame.cpp` 中方向数组都按 M1..M4 排列，依据官方代码设置：
-输出反向为 `{true, true, false, false}`，原始编码器计数反向为 `{false, false, true, true}`。
-官方左侧将 PWM 取反、右侧保持，编码器累计则左侧取 TIM 正增量、右侧取负增量。
+`MainFrame.cpp` 中方向数组都按 M1..M4 排列：
+输出反向为 `{true, true, false, false}`，原始编码器计数反向为 `{false, false, true, false}`。
+输出与 M1～M3 反馈沿用原配置。M4 更换 520 后，DAPLink 读取显示正目标下原始计数递增，
+旧的反馈取反造成负 RPM 并触发方向保护，因此 M4 改为不取反；用户已确认改后 M4 单轮现象正常。
 若电机接线被更改，仍须根据实测分别校正两组方向。
 `output_reverse` 和 `encoder_reverse` 分别校正输出与反馈：车辆前进时，正占空比和正 RPM 必须一致。
 不要在 PID 内用负增益补偿接线方向。
@@ -89,7 +93,7 @@ CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运�
 `DcMotor::GetDuty()` 是最近接受的限幅指令，`MotorPwmDriver::GetAppliedDuty()` 是当前实际施加的逻辑占空比。
 
 本板使用实际 PWM：`deadzone_duty=0`，实际输出上限为 0.69。
-八组实测 PI 基于这一输出方式，不能叠加参考工程的 2000/3600 固定补偿。
+当前初始 PI 基于这一输出方式，不能叠加参考工程的 2000/3600 固定补偿。
 适配器仍保留通用的死区补偿能力，供其他配置使用；本板当前不启用。
 `DutyLimSet()` 限制控制量，实际 PWM 可从 `GetAppliedDuty()` 读取。
 
@@ -120,17 +124,18 @@ CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运�
 `IsOnline()` 只判断样本新鲜，静止时也有零 RPM 样本；它无法识别编码器断线、堵转或错误 CPR。
 本板没有接入电机电流测量，因此库没有过流或堵转判定。
 
-## 正式速度 PI 配置
+## 520 初始速度 PI 配置
 
-`Apps/Inc/MotorSpeedProfiles.hpp` 按 M1～M4 保存前进、后退共八组实测参数。
+`Apps/Inc/MotorSpeedProfiles.hpp` 按 M1～M4 保存前进、后退参数，暂时各轮相同：
+**Kp=0.0012、Ki=0.008、Kd=0**。这是用于先观察现象的初值，尚未实车调参。
 本板初始化四轮驱动后，分别调用 `MotorSpeedProfiles::Apply(motor, port, false)` 配置前进参数，
-保持禁能，没有自动目标或定时前进/后退流程。参数完整记录见 [实测数据](../../../docs/motor_pid_20261001/README.md)。
+保持禁能；随后由选中的试车或比赛应用决定何时使能。旧 310 实测参数不再用于新电机。
 
 - PI 输入为输出轴 RPM，积分时间单位为秒，输出为实际 PWM 占空比；Kd=0。
 - 输出限幅和积分限幅均为 0.69，反馈低通时间常数 0.03 秒。
 - `GetMeasure().speed_rpm` 保留原始测速；`GetFilteredRpm()` 返回闭环使用的滤波值。
 - 通用库的 `feedback_filter_tau_s=0` 表示不滤波，本板参数显式设置为 0.03 秒。
-- 当前目标限幅为 160 RPM，只是软件命令边界。验证范围仍为架空 40/60 RPM，负载及更高转速待验证。
+- 当前目标限幅为 180 RPM，试车使用 60/120 RPM。软件限制不是实际可达转速保证。
 - `Apply` 只接受就绪、禁能的电机和端口 1～4，清除旧目标和积分，配置后不自动使能。
 
 上层需要后退参数时，先提交停车并等车轮停稳，再禁能并切换。配置示例：
@@ -146,19 +151,21 @@ if (!MotorSpeedProfiles::Apply(Motor1, 1, true))
 ```
 
 不要每次更新目标都 Apply；会反复清积分，破坏速度环。
-通用库默认增益为零，其他板级适配须自行配置；不能直接采用旧试验的猜测增益。
+通用库默认增益为零，板级配置显式设置当前 520 初值；其他电机需要重新配置和验证。
 各轮反馈、PID 和故障独立，`MainFrame` 的系统停车回调禁能四轮。
-临时试验中的方向/180 RPM 超速/无计数检测随试验入口撤下，正式控制应按比赛需要实现整车运行监测。
-现有库仍保留命令过期、反馈过期、非法输入和输出失败停机，不含电流保护。
+方向、400 RPM 超速、持续低于 3 RPM、反馈/驱动故障、50 ms 调度中断已抽到正式 MotorProtection。
+该模块异常时禁能四轮并锁定故障，默认任务每周期调用。停稳等待接口保留原阈值，不自动反向。
+使用方式、恢复和限制见 [电机保护](../../../docs/motor_protection.md)。
+DcMotor 原命令/反馈超时、非法输入、输出失败、限幅及 PID 保护保留，不含电流检测保护。
 
 ## 当前应用与验证
 
-`RobotSystemCpp()` 只运行 `FrameTickCpp()`；没有测试分支，也不初始化电机专用 USART1。
-`OffroadApp::Control()` 仍停车，传感器采集和比赛策略尚待正式集成；上电或复位不会自动试跑。
-FlyMCU 下载仍使用原板载串口，当前固件不再输出 BOOT/TEST 调试日志。
+当前恢复原 LineFollowBoard 选择的应用，不再编译自动试车或传感器诊断。
+MainFrame 绑定四轮 MotorSafety 和原厂超声波；循迹入口保留原灰度预热、操作者校准、自检和显式启动。
+四轮初始化后禁能，保护模块不使能电机；循迹原 OLED 轮速显示保留。
+使用 DAPLink / CMSIS-DAP 下载工程的正常 AXF，新独立 HEX 为 `MDK-ARM/robot_firmware.hex`。
+旧试车 HEX 已从本地清理，源码变化只有下载新固件后才会影响开发板。
 
-主机回归覆盖双 PWM、换向等待、编码器回绕、资源冲突、HAL 失败、默认禁能、指令/反馈超时、
-非有限输入、PID 饱和处理，以及实测参数配置和滤波保留原始测速。
-运行 `tests/frame/Run-Tests.ps1`；固件使用 Keil ARM Compiler V6 Rebuild。
-清理版本构建日志为 `MDK-ARM/build-clean-v6.log`，AXF/HEX 仍在正常 Keil 输出目录。
-本次软件验证不能替代落地、四轮共同负载和比赛地面验证。
+主机回归覆盖 AT8236、1320 CPR、PID/滤波、资源冲突、HAL 故障、超时及正式四轮保护。
+试车时序只保留在 tests/frame/fixtures，不参与 Keil 编译。全部回归和 V6 Rebuild 通过，0 Error / 0 Warning。
+清理构建日志：`MDK-ARM/build-clean-v6.log`。新保护模块的整车行为仍需后续实测，初始 PI 未正式调参。

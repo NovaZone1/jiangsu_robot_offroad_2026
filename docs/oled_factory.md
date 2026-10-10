@@ -1,3 +1,7 @@
+> 当前更新：临时显示应用已移至 tests/frame/fixtures，不参与固件。驱动和正式框架保留；下文为历史交付记录。旧接入补丁已移除，不再应用；当前说明见 [框架](../FrameComponets/README.md)。
+
+> 2026-10-10 更新：已按用户要求重新接入超声波距离 OLED 测试，电机禁能。当前配置、下载和验证步骤见 [测距测试](range_oled_temporary_test.md)。下文保留此前交付记录，其中撤下状态、旧补丁及早期构建环境描述属于历史。
+
 > 当前状态：超声波与灰度 OLED 临时测试均已撤下。OLED 驱动保留但不参与当前固件编译；[灰度测试记录](gray_oled_test.md)保留用户反馈。下文测距显示接入步骤仅为历史说明。
 > 专用RangeDisplayApp已从FrameComponets移出，仅保留在tests/frame/fixtures供主机回归测试使用。可复用驱动保留，未参与当前固件编译。不要重新应用旧接入补丁；不要用Sync-FrameProject将暂存驱动重新加入工程。用户的Keil版本及RTE设置保留。
 

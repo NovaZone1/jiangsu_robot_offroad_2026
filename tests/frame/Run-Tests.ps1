@@ -7,7 +7,10 @@ $taskArgs = @('-std=c++11','-Wall','-Wextra','-Werror','-DARM_MATH_MATRIX_CHECK'
     '-I',"$PSScriptRoot\mocks",'-I',"$PSScriptRoot\fixtures",'-I',"$taskRoot\FrameComponets\Bsps\Inc",
     '-I',"$taskRoot\FrameComponets\Mods\Inc",'-I',"$taskRoot\FrameComponets\Sys\Inc",
     '-I',"$taskRoot\FrameComponets\Apps\Inc",'-I',"$taskRoot\FrameComponets\Algorithm\Inc", "$PSScriptRoot\frame_tests.cpp", "$PSScriptRoot\motor_tests.cpp")
-foreach ($taskSource in @('Bsps/Src/bsp_dwt.c','Bsps/Src/bsp_tim_pwm.c','Bsps/Src/bsp_encoder.c','Algorithm/Src/pid.cpp','Algorithm/Src/std_math.cpp',
+$taskArgs += "$PSScriptRoot\motor520_tests.cpp"
+$taskArgs += "$PSScriptRoot\fixtures\Motor520Test.cpp"
+$taskArgs += "$PSScriptRoot\motor_protection_tests.cpp"
+foreach ($taskSource in @('Apps/Src/MotorProtection.cpp','Bsps/Src/bsp_dwt.c','Bsps/Src/bsp_tim_pwm.c','Bsps/Src/bsp_encoder.c','Algorithm/Src/pid.cpp','Algorithm/Src/std_math.cpp',
     'Algorithm/Src/signator.cpp','Algorithm/Src/adrc.cpp','Algorithm/Src/hyperPID.cpp',
     'Sys/Src/StateCore.cpp','Sys/Src/Action.cpp','Sys/Src/Application.cpp','Sys/Src/System.cpp','Sys/Src/Monitor.cpp',
     'Mods/Src/dc_motor.cpp','Mods/Src/motor_pwm_driver.cpp','Mods/Src/gray_sensor.cpp','Mods/Src/ultrasonic.cpp','Apps/Src/OffroadApp.cpp')) {

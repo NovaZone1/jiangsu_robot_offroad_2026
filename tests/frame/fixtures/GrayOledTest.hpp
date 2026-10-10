@@ -3,7 +3,7 @@
 #include "gray_yahboom_8lp.hpp"
 #include "oled_factory.hpp"
 
-// Historical stationary diagnostic, retained only for host regression tests.
+// Host-only regression fixture; no diagnostic entry in the production firmware.
 // Lifetime must cover the firmware: GrayYahboom8Lp registers member addresses.
 class GrayOledTest
 {

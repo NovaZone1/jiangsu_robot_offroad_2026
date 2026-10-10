@@ -65,6 +65,7 @@ void RunMotorTests()
     MotorPwmDriver::Config config;
     config.pwm_timer = &pwm;
     config.encoder_timer = &encoder;
+    config.counts_per_output_rev = 1040; // 显式保留旧 310 配置的兼容性测试。
     test_tick = 0;
     assert(driver.Init(config));
     assert(!driver.Init(config)); // 禁止运行期间重新注册同一驱动

@@ -2,12 +2,14 @@
 #include "Application.hpp"
 #include "oled_factory.hpp"
 
+// Host-only diagnostic display regression; not a production application.
 class RangeDisplayApp : public Application
 {
 public:
     RangeDisplayApp() : Application("RangeDisplay")
     {
     }
+
     App::Status GetStatus() override;
 
 protected:

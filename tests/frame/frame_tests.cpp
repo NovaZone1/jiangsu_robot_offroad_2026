@@ -16,6 +16,8 @@ TestDwt test_dwt = {};
 TestCoreDebug test_core_debug = {};
 uint32_t test_tick = 0, test_primask = 0;
 void RunMotorTests();
+void RunMotor520Tests();
+void RunMotorProtectionTests();
 static int first_calls, second_calls, stop_calls;
 
 static void First(StateCore *)
@@ -276,6 +278,8 @@ int main()
     monitor.LogInfo("%s", long_message);
     assert(strlen(log_result) <= 127 && log_result[strlen(log_result) - 1] == '\n');
     RunMotorTests();
+    RunMotor520Tests();
+    RunMotorProtectionTests();
     puts("PASS: matrix/CMSIS, Kalman input, IV reset, ADRC guards, DWT rollover, PID, states, "
          "actions and module guards");
 }

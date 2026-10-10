@@ -2,9 +2,11 @@
 #include "bsp_motor_board.h"
 #include "MotorSpeedProfiles.hpp"
 #include "LineFollowBoard.hpp"
+#include "ultrasonic_factory.hpp"
 
 MotorPwmDriver Motor1Driver, Motor2Driver, Motor3Driver, Motor4Driver;
 DcMotor Motor1, Motor2, Motor3, Motor4;
+MotorProtection MotorSafety(Motor1, Motor2, Motor3, Motor4);
 MotorPwmDriver &LeftMotorDriver = Motor1Driver;
 MotorPwmDriver &RightMotorDriver = Motor3Driver;
 DcMotor &LeftMotor = Motor1;
@@ -24,9 +26,9 @@ namespace
     MotorPwmDriver *const drivers[] = {&Motor1Driver, &Motor2Driver, &Motor3Driver, &Motor4Driver};
 
     // M1 左前、M2 左后、M3 右前、M4 右后。
-    // 对照官方 car_tracking：左侧 PWM 反向；编码器左侧取正增量、右侧取负增量。
+    // 左侧 PWM 反向；M4 的 520 电机正向原始计数实测递增，反馈不取反。
     const bool output_reverse[] = {true, true, false, false};
-    const bool encoder_reverse[] = {false, false, true, true};
+    const bool encoder_reverse[] = {false, false, true, false};
 
     bool BindHardware()
     {
@@ -46,10 +48,11 @@ namespace
             config.in1_channel = port.in1_channel;
             config.in2_channel = port.in2_channel;
             config.encoder_timer = port.encoder;
+            config.counts_per_output_rev = MotorSpeedProfiles::counts_per_output_rev;
             config.output_reverse = output_reverse[index];
             // 此表直接针对 TIM 原始计数，已经包含 M4 的实际 A/B 布线，不再额外异或。
             config.encoder_reverse = encoder_reverse[index];
-            // 实测 PI 基于实际 PWM，不能叠加旧的固定死区补偿。
+            // 520 初始 PI 使用实际 PWM，不叠加旧的固定死区补偿。
             config.deadzone_duty = 0;
             config.maximum_duty = MotorSpeedProfiles::duty_limit;
             if (!drivers[index]->Init(config))
@@ -62,6 +65,14 @@ namespace
                 return false;
             }
         }
+        if (!MotorSafety.Init())
+        {
+            return false;
+        }
+        if (!FactoryUltrasonic::Init(RangeSensor))
+        {
+            System.monitor.LogError("Factory ultrasonic initialization failed");
+        }
         if (LineFollowBoard::Enabled)
         {
             LineFollowApp::Config config;
@@ -70,9 +81,8 @@ namespace
                 return false;
             }
         }
-        // 已实测方向；四轮配置前进 PI 后仍保持禁能，只有应用可显式使能。
+        // 用户已确认四路单轮测试正常；初始化后保持禁能，比赛启动仍需通过自检。
         // 传感器负责人在这里补充各自驱动绑定。
-        // RangeSensor.Bind(...);
         // GrayArray.Bind(...);
         // StatusLed.Init(LED_GPIO_Port, LED_Pin, Actuator::Trigger_High);
         // System.monitor.Init(LogSink);

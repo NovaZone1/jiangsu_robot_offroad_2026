@@ -9,9 +9,3 @@
 #define FRAME_SYSTEM_PERIOD_MS 5U
 #define FRAME_REQUIRED_LAPS 3U
 #define FRAME_MAX_MOTORS 8U
-
-// 灰度 OLED 临时试验也已撤下；保留配置名，试验源码仅用于主机回归。
-#define FRAME_GRAY_OLED_TEST_ENABLED 0U
-#if FRAME_GRAY_OLED_TEST_ENABLED
-#error "Bench tests are no longer firmware entry points"
-#endif

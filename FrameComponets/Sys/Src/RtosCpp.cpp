@@ -17,6 +17,15 @@ void FrameTickCpp(void)
 {
     static uint8_t prescaler = 0;
     BspDwt_CntUpdate();
+    if (!MotorSafety.BeforeControl())
+    {
+        System.Stop(true);
+        return;
+    }
+    if (MotorSafety.IsCoasting())
+    {
+        System.Stop();
+    }
     Offroad.SampleSensors();
     if (++prescaler >= FRAME_SYSTEM_PERIOD_MS / FRAME_CONTROL_PERIOD_MS)
     {
@@ -38,6 +47,10 @@ void FrameTickCpp(void)
         Offroad.Control();
     }
     DcMotor::ControlAllMotors();
+    if (!MotorSafety.AfterControl())
+    {
+        System.Stop(true);
+    }
     if (LineFollowBoard::Enabled)
     {
         LineFollow.UpdateDisplay();

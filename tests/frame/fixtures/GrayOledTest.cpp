@@ -1,5 +1,5 @@
 #include "GrayOledTest.hpp"
-// Not compiled into firmware after completion of the hardware test.
+// Historical raw GPIO display, retained for host regression only.
 #include <stdio.h>
 
 bool GrayOledTest::Init()

@@ -1,10 +1,10 @@
 # STM32F103ZE 越野比赛框架
 
-> 用户已反馈 [灰度＋OLED 诊断](../docs/gray_oled_test.md)检测无误，临时入口及编译项已撤下。
-> 电机自动试车、串口调参及电机测试夹具已移除，恢复框架调度，上电四轮禁能。
-> 正式实测参数位于 `Apps/Inc/MotorSpeedProfiles.hpp`，配置不自动使能或提交速度目标。
-> 四轮架空正反转 40/60 RPM 实测已完成，32 次重复验证达标；见 [参数记录](../docs/motor_pid_20261001/README.md)。
-> 灰度、OLED、超声波适配源码保留供正式集成，目前没有启用这些硬件入口。
+> 临时电机、灰度、超声波测试入口已从固件清理，驱动与保护保留；主机夹具仅用于回归。
+> 当前电机为 520、30:1、11 线，输出轴 1320 计数/圈，四路单轮测试及灰度测试已获用户确认。
+> 原循迹框架恢复，上电禁能；启动仍需要校准、自检和显式请求。初始 PI 尚未正式调参。
+> 方向、无转速、超速、超时和停车等待由正式 [MotorProtection](../docs/motor_protection.md) 保留。
+> 原厂超声波绑定和 OLED/灰度驱动保留，比赛策略联合验证尚未完成。
 
 移植参考为 [ZWJ_GeneralFramework 的 V1_main 分支](https://github.com/zwj051029/ZWJ_GeneralFramework/tree/V1_main)，
 固定提交 `e403922005831e20a1f764486dffbcb64c216bb5`。
@@ -29,12 +29,11 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Bsps | std_cpp、frame_config | C/C++ 桥接和框架容量/周期配置 |
 | Mods | std_actuator、led | V1_main 通用执行器及普通指示灯 |
 | Mods | std_sensor | V1_main 通用 GPIO 传感器；改为固定容量，去除动态分配及旧 UART 灰度协议 |
-| Mods / Bsps | dc_motor、motor_pwm_driver、bsp_motor_board | 本板 AT8236 双 PWM、310 编码器 RPM、独立速度 PID 与反馈滤波；已完成架空实测 |
+| Mods / Bsps | dc_motor、motor_pwm_driver、bsp_motor_board | 本板 AT8236 双 PWM、520 编码器 RPM、独立速度 PID 与反馈滤波；四路单轮测试已通过 |
 | Mods | ultrasonic、gray_sensor | 模块接口和实现位置，硬件采集驱动待编写；未绑定时不伪造就绪状态 |
 | Sys | StateCore、Action | 移植状态图、状态切换、动作超时/取消及非阻塞等待；修正当前状态复制、空图和空指针问题 |
 | Sys | Application、System、Monitor、RtosCpp、SysDefs | 应用生命周期独立于系统调度；保留注册、自检、日志和任务桥接，使用 F103 比赛配置和单线程框架调度 |
-| Apps | MainFrame、MotorSpeedProfiles、OffroadApp | 板级绑定、实测正反转 PI 配置、越野应用及比赛策略扩展位置 |
-| tests/frame/fixtures | GrayOledTest、RangeDisplayApp | 传感器主机回归夹具，不参与固件编译 |
+| Apps | MainFrame、MotorSpeedProfiles、MotorProtection、OffroadApp | 板级绑定、初始 PI、正式电机保护及比赛策略扩展位置 |
 
 `Libs → Bsps`；Algorithm 为独立层，算法头文件位于 `Algorithm/Inc`，
 源文件位于 `Algorithm/Src`，原 Bsps 下的三个算法已经迁回 Algorithm，避免重复编译。
@@ -45,19 +44,19 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
 ## 三类新模块的位置
 
 - `Mods/Inc/dc_motor.hpp`、`Mods/Src/dc_motor.cpp`：生命周期、占空比和输出轴 RPM 速度 PID 接口。
-  配套 `motor_pwm_driver` 和 `Bsps/bsp_motor_board` 已适配 AT8236 与 310 电机；详见 [电机说明](Mods/MOTOR.md)。
+  配套 `motor_pwm_driver` 和 `Bsps/bsp_motor_board` 已适配 AT8236 与 520 电机；详见 [电机说明](Mods/MOTOR.md)。
 - `Mods/Inc/ultrasonic.hpp`、`Mods/Src/ultrasonic.cpp`：预留新测距数据及有效时间戳。
   需要按型号补充触发/回波捕获或串口协议、测量超时、触发间隔和距离换算。
 - `Mods/Inc/gray_sensor.hpp`、`Mods/Src/gray_sensor.cpp`：预留最多 16 路采样及标定结果。
   需要按型号补充 GPIO/ADC/串口读取、白线与背景标定、通道位置。
   `GetLineError()` 只计算已标定数据的加权偏差，不代替实际采集驱动。
 
-电机已有实际硬件驱动；超声波、灰度的独立适配也已保留，但尚未正式绑定。
-`Apps/Src/MainFrame.cpp` 集中绑定四轮：M1 左前、M2 左后、M3 右前、M4 右后。
-底层初始化保持禁能，两个临时试验入口均已撤下，默认任务运行原框架。
-传感器未绑定时保持自检等待，不会自动开始循迹或电机试验。
-方向和非零 PWM 死区补偿已对照用户提供的官方 `car_tracking`：左侧反向输出、右侧反向反馈。
-电机实际接线仍需验证；旧测试 USART1/PA9 日志入口已撤下。
+电机、原厂超声波和八路灰度驱动保留。MainFrame 绑定四轮、MotorSafety、原厂超声波，
+并按 LineFollowBoard 选择初始化灰度和循迹应用。四轮初始化后禁能，等待原校准、自检与启动条件。
+默认任务每 1 ms 采样/控制，MotorSafety 在输出前检查调度、测速后检查反馈和运动异常。
+临时自动试车和灰度/超声波诊断已移至 tests/frame/fixtures；固件不编译这些类，也没有测试宏。
+M4 的 520 编码器方向已按实测修正，其余方向沿用已确认配置；PWM 不叠加旧固定死区补偿。
+
 绑定的驱动、GPIO/UART 注册对象、应用和状态图必须保持静态或全程有效的生命周期。
 初始化/注册只能在框架任务开始前完成，或由同一个框架任务执行。
 

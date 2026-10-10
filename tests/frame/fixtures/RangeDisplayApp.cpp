@@ -1,4 +1,5 @@
 #include "RangeDisplayApp.hpp"
+// Historical display, host regression only.
 #include "ultrasonic_factory.hpp"
 #include "System.hpp"
 #include "stm32f1xx_hal.h"
@@ -21,7 +22,7 @@ void RangeDisplayApp::Start()
 
 App::Status RangeDisplayApp::GetStatus()
 {
-    // Display is diagnostic, not a prerequisite for the existing vehicle self-check.
+    // Display health does not substitute for sensor validity.
     return display_.IsHealthy() ? App::Normal : App::Warning;
 }
 

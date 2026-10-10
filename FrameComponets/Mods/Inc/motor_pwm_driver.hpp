@@ -14,7 +14,7 @@ public:
         uint32_t in1_channel = TIM_CHANNEL_1;
         uint32_t in2_channel = TIM_CHANNEL_2;
         TIM_HandleTypeDef *encoder_timer = nullptr;
-        float counts_per_output_rev = 1040; // 310：20 × 13 × 4
+        float counts_per_output_rev = 1320; // 520：30 × 11 × 4；板级仍应显式指定。
         uint32_t rpm_period_ms = 10;
         uint32_t reversal_deadtime_ms = 2;
         bool output_reverse = false;

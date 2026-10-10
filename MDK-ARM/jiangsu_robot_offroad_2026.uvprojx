@@ -10,7 +10,7 @@
       <TargetName>jiangsu_robot_offroad_2026</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>6070000::V6.7::.\ARMCLANG</pCCUsed>
+      <pCCUsed>6140001::V6.14.1::ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
@@ -134,11 +134,11 @@
             <RunIndependent>0</RunIndependent>
             <UpdateFlashBeforeDebugging>1</UpdateFlashBeforeDebugging>
             <Capability>1</Capability>
-            <DriverSelection>4101</DriverSelection>
+            <DriverSelection>4096</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3></Flash3>
+          <Flash3>"" ()</Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -674,9 +674,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
-        <Group>
           <GroupName>Frame/Bsps</GroupName>
           <Files>
             <File>
@@ -719,6 +716,11 @@
               <FileType>1</FileType>
               <FilePath>../FrameComponets/Bsps/Src/bsp_oled_bus.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_ultrasonic_echo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../FrameComponets/Bsps/Src/bsp_ultrasonic_echo.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -758,6 +760,11 @@
               <FileName>ultrasonic.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/ultrasonic.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>ultrasonic_factory.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/ultrasonic_factory.cpp</FilePath>
             </File>
             <File>
               <FileName>gray_yahboom_8lp.cpp</FileName>
@@ -813,6 +820,11 @@
               <FileName>MainFrame.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Apps/Src/MainFrame.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>MotorProtection.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/MotorProtection.cpp</FilePath>
             </File>
             <File>
               <FileName>OffroadApp.cpp</FileName>
@@ -875,6 +887,9 @@
               <FilePath>../FrameComponets/Algorithm/Src/std_math.cpp</FilePath>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>

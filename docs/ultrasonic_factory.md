@@ -1,3 +1,7 @@
+> 当前更新：临时显示应用已移至 tests/frame/fixtures，不参与固件。驱动和正式框架保留；下文为历史交付记录。旧接入补丁已移除，不再应用；当前说明见 [框架](../FrameComponets/README.md)。
+
+> 2026-10-10 更新：已按用户要求重新接入超声波距离 OLED 测试，电机禁能。当前配置、下载和验证步骤见 [测距测试](range_oled_temporary_test.md)。下文保留此前交付记录，其中撤下状态、旧补丁及早期构建环境描述属于历史。
+
 > 当前状态：已按用户要求撤下超声波＋OLED临时测试。MainFrame已恢复原入口，Keil中5个测试相关源文件条目已移除。下文接入步骤仅为历史说明，不代表当前已启用。
 > 专用RangeDisplayApp已从FrameComponets移出，仅保留在tests/frame/fixtures供主机回归测试使用。可复用驱动保留，未参与当前固件编译。不要重新应用旧接入补丁；不要用Sync-FrameProject将暂存驱动重新加入工程。用户的Keil版本及RTE设置保留。
 
