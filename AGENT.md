@@ -5,14 +5,11 @@
 
 ## 1. 当前工程状态
 
-- 当前临时交付为 **M3 右前轮本地持续 150 RPM 测试固件**，`MotorContinuousTest.hpp` 的
-  `MOTOR_CONTINUOUS_TEST=1`、`SelectedPort=3`。上电等待约 2 秒并停稳后自动启动 M3，M1/M2/M4 禁能。
-  原 MotorProtection 和驱动保护保留；Nova/比赛入口不调度。说明见 [本地单轮测试](docs/motor_continuous_test.md)。
-  本节的临时选择优先于下文原清理版/Nova 行为说明；恢复 Nova 前将本地测试宏设为 0。
-- 已保留 **M1 单轮 Nova 调参固件**，`NovaLink.hpp` 的 `NOVA_M1_TUNING=1`。
-  只允许 M1 试验，M2～M4 持续禁能；不注册/调度比赛应用，不要求未连接的灰度/超声波通过自检。
-  原比赛逻辑和 MotorProtection 保留；恢复比赛需将该开关改为 0 并重新编译、验证。
-  使用 [M1 调参说明](docs/nova_m1_tuning.md) 和提供的 JSON 档案，禁止用通用默认范围试转。
+- 当前交付四轮 PID 清理版：上电禁能，恢复 LineFollowBoard 选择的应用；启动需校准、自检和显式请求。
+  自动持续试转入口已删除；MotorContinuousTest 仅位于 tests/frame/fixtures，不参与固件编译。
+  Nova 蓝牙通信与调参协议保留，`NOVA_MOTOR_TUNING=0` 默认关闭 AI 运动控制。
+  四轮正转 PID、100 RPM 实测和数据来源统一记录于 [四轮参数记录](docs/motor_pid_20261011.md)。
+  PWM/积分限幅仍为 69%，原 MotorProtection、超时、故障锁定和停稳互锁保持不变。
 
 - 主控 STM32F103ZET6，72 MHz，Cortex-M3，无 FPU；Keil ARM Compiler V6，当前本机 V6.14.1。
 - FreeRTOS 使用 `portable/GCC/ARM_CM3`，默认任务通过 osDelayUntil 每 1 ms 推进框架，TIM6 是 HAL 时间基准。
@@ -20,7 +17,8 @@
 - 四路电机为 520、30:1、11 线，四倍频为输出轴 1320 计数/圈。用户已确认四路单轮测试正常。
   M1 左前、M2 左后、M3 右前、M4 右后；方向集中在 MainFrame，M4 原始计数不取反。
   初始 PI 为 Kp=0.0012、Ki=0.008、Kd=0，滤波 0.03 秒、PWM/积分限幅 0.69、目标上限 180 RPM。
-  这些值尚未正式调参；旧 310 实测记录只作历史，不能套用到 520。
+  M1 正转已固化为 0.000957/0.009191/0（2026-10-11、100 RPM 台架复测）；M3 正转固化为 0.001176/0.013926/0；M2 正转固化为 0.001329/0.010857/0；M4 正转固化为 0.001442/0.010392/0；四轮反转仍未调参。
+  旧 310 实测记录只作历史，不能套用到 520。
 - 用户已确认八路灰度 OLED 测试正常。接线 x1～x8 为 PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1。
   正式循迹仍需要预热、操作者确认 KEY1 校准和新鲜有效样本；不自动伪造校准成功。
 - 保留原厂超声波驱动并在 MainFrame 绑定：PF11 TRIG、PF12 ECHO、TIM7、EXTI12、DWT。
@@ -97,8 +95,8 @@ JTAG 已关闭以使用 PA15/PB3/PB4，SWD 保留。其他模块不得改回相�
 `Init()` / `Bind()` 默认禁能；占空比模式需显式 `Enable()`。
 `Neutral()` / `Stop()` 清空目标并滑行，保留使能；`Disable()` 同时禁能。
 `FrameTickCpp()` 每 1 ms 调用批量控制，命令默认 250 ms 过期。
-当前固件无临时试车入口；通用库默认增益为零，板级显式配置 520 初值。
-本板初始化显式应用 520 初始前进 PI，保持禁能；`MotorSpeedProfiles::Apply(motor, port, backward)`
+当前固件无临时试车入口；通用库默认增益为零，板级显式配置各轮 520 已调参数。
+本板初始化显式应用各轮已调前进 PI，保持禁能；`MotorSpeedProfiles::Apply(motor, port, backward)`
 只接受已初始化、禁能的电机，配置时清除旧目标和积分，完成后仍需显式 Enable。
 不能在每次提交目标时重复 Apply；使用后退参数时也必须先停车、禁能再切换。
 当前参数要求 `deadzone_duty=0`，不能叠加旧固定补偿。
@@ -200,7 +198,7 @@ GrayArray.Bind(&gray_context, ReadGray);
   应用、系统、状态机和动作的周期为 5 ms；状态机/动作仅在 WORKING 时运行。
   最后调用 `DcMotor::ControlAllMotors()`，禁能状态也采集编码器。
   临时试车入口已清理；NovaLink 在每周期保护检查前处理有界通信，故障时仍可接收停车命令。
-  蓝牙连接不自动启动电机；M1 模式仅在完成限幅配置、停稳并显式 set_target 后启动。
+  蓝牙连接不自动启动电机；单轮模式仅在完成限幅配置、停稳并显式 set_target 后启动。
   参数仅在禁能时更新（可以正在滑行），重新使能仍须停稳；原保护和故障锁定不能绕过。
   循环使用 osDelayUntil，上述周期是设计目标，不能当作实测保证。
 - Reader 和控制回调应及时返回，不得在这条共享循环中等待硬件、执行阻塞日志或使用 `Seq::Wait/WaitUntil`。
@@ -211,8 +209,8 @@ GrayArray.Bind(&gray_context, ReadGray);
 - 原 bsp_uart 仍提供普通 DMA；USART1 由独立 bsp_uart1_dma 实现循环 DMA 增量处理，不能重复注册。
   USART1 / DMA1 CH4/5 的 IRQ 在该 BSP 中唯一实现，不占用已有 HAL UART 回调。
   Bluetooth 负责透传，NovaProtocol 负责协议，NovaLink 负责四轮/循迹参数绑定；详见 [蓝牙与 Nova](docs/bluetooth_nova.md)。
-  M1 调参模式已绑定 configure/heartbeat/set_target，只有通道 1 宣告完整自动能力。
-  M1 使用 DcMotor 可选 D-on-measurement；其他电机和比赛模式仍使用原 D-on-error，不得混淆参数。
+  可选单轮调参模式（默认关闭）已绑定 configure/heartbeat/set_target，仅 `NOVA_TUNING_PORT` 指定通道宣告完整自动能力。
+  所选电机使用 DcMotor 可选 D-on-measurement；其他电机和比赛模式仍使用原 D-on-error，不得混淆参数。
   心跳 0.8～2 秒、单轮 45 秒硬上限、目标绝对上限 150 RPM、PWM 硬上限 0.69；异常锁定至复位。
   STOP 立即禁能，后续启动仍等待原停稳互锁；配置与参数下发不会自行启动。
   蓝牙实物已确认是 DX-BT24 BLE 5.1，FFE0 服务、FFE1 通知、FFE2 写入；电脑使用

@@ -7,7 +7,6 @@
 #include "bsp_dwt.h"
 #include "cmsis_os.h"
 #include "NovaLink.hpp"
-#include "MotorContinuousTest.hpp"
 
 void MainInitCpp(void)
 {
@@ -19,18 +18,6 @@ void FrameTickCpp(void)
 {
     static uint8_t prescaler = 0;
     BspDwt_CntUpdate();
-    if (MotorContinuousTest::Enabled)
-    {
-        if (System.GetState() == Systems::ERROR)
-        {
-            MotorBench.Stop();
-        }
-        if (!MotorBench.Run())
-        {
-            System.Stop(true);
-        }
-        return; // No Nova/competition writer runs in this local test mode.
-    }
     NovaLink.Service();
     if (!MotorSafety.BeforeControl())
     {
@@ -38,7 +25,7 @@ void FrameTickCpp(void)
         NovaLink.AfterControl();
         return;
     }
-    if (NovaLinkApp::M1TuningEnabled)
+    if (NovaLinkApp::MotorTuningEnabled)
     {
         // Exclusive bench ownership: skip competition updates, start requests and wheel writers.
         // Normal driver feedback/control and all original motor protection remain active.

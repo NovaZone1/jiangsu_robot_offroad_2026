@@ -78,7 +78,7 @@ namespace
                     f.fresh = test_tick % 10 == 0;
                 }
                 bench.Run();
-                assert(fabsf(feedback[MotorContinuousTest::SelectedIndex].duty) <= 0.50001f);
+                assert(fabsf(feedback[MotorContinuousTest::SelectedIndex].duty) <= 0.69001f);
                 for (uint8_t i = 0; i < 4; ++i)
                 {
                     if (i != MotorContinuousTest::SelectedIndex)
@@ -111,10 +111,10 @@ int main()
         assert(!r.motors[MotorContinuousTest::SelectedIndex].IsEnabled());
         r.Step(1);
         assert(r.motors[MotorContinuousTest::SelectedIndex].IsEnabled() &&
-               r.motors[MotorContinuousTest::SelectedIndex].GetTargetSpeed() == 150);
+               r.motors[MotorContinuousTest::SelectedIndex].GetTargetSpeed() == 100);
         r.Step(60000); // Local source runs beyond Nova's trial cap without a serial heartbeat.
         assert(r.bench.GetStatus().phase == MotorContinuousTest::Phase::Running);
-        assert(fabsf(r.feedback[MotorContinuousTest::SelectedIndex].rpm - 150) < 2);
+        assert(fabsf(r.feedback[MotorContinuousTest::SelectedIndex].rpm - 100) < 2);
         r.bench.Stop();
         r.Step(5000);
         assert(!r.motors[MotorContinuousTest::SelectedIndex].IsEnabled());
@@ -124,7 +124,7 @@ int main()
         r.plant = false;
         r.Step(3600);
         assert(r.guard.GetStatus().failed_port == MotorContinuousTest::SelectedPort);
-        assert(r.bench.GetStatus().duty > 0);
+        assert(fabsf(r.bench.GetStatus().duty - 0.69f) < 0.00001f);
         r.ExpectFault(MotorProtection::Fault::NoMotion);
     }
     {
@@ -179,5 +179,7 @@ int main()
         r.Step(3200);
         r.ExpectFault(MotorProtection::Fault::CoastTimeout);
     }
-    puts("M3 continuous: startup, 60 s run, exclusive wheel control and protection tests passed");
+    printf(
+        "M%u continuous: startup, 60 s run, exclusive wheel control and protection tests passed\n",
+        static_cast<unsigned>(MotorContinuousTest::SelectedPort));
 }

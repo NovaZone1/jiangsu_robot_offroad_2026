@@ -1,10 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="project_projx.xsd">
-
   <SchemaVersion>2.1</SchemaVersion>
-
   <Header>### uVision Project, (C) Keil Software</Header>
-
   <Targets>
     <Target>
       <TargetName>jiangsu_robot_offroad_2026</TargetName>
@@ -668,10 +665,13 @@
                   <IncludeLibraryModules></IncludeLibraryModules>
                   <ComprImg>1</ComprImg>
                 </CommonProperty>
-                <FileArmAds/>
+                <FileArmAds />
               </FileOption>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
         <Group>
           <GroupName>Frame/Bsps</GroupName>
@@ -702,6 +702,11 @@
               <FilePath>../FrameComponets/Bsps/Src/bsp_motor_board.c</FilePath>
             </File>
             <File>
+              <FileName>bsp_oled_bus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../FrameComponets/Bsps/Src/bsp_oled_bus.c</FilePath>
+            </File>
+            <File>
               <FileName>bsp_tim_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>../FrameComponets/Bsps/Src/bsp_tim_pwm.c</FilePath>
@@ -717,11 +722,6 @@
               <FilePath>../FrameComponets/Bsps/Src/bsp_uart1_dma.c</FilePath>
             </File>
             <File>
-              <FileName>bsp_oled_bus.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../FrameComponets/Bsps/Src/bsp_oled_bus.c</FilePath>
-            </File>
-            <File>
               <FileName>bsp_ultrasonic_echo.c</FileName>
               <FileType>1</FileType>
               <FilePath>../FrameComponets/Bsps/Src/bsp_ultrasonic_echo.c</FilePath>
@@ -732,24 +732,24 @@
           <GroupName>Frame/Mods</GroupName>
           <Files>
             <File>
-              <FileName>dc_motor.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Mods/Src/dc_motor.cpp</FilePath>
-            </File>
-            <File>
               <FileName>bluetooth.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/bluetooth.cpp</FilePath>
             </File>
             <File>
-              <FileName>nova_protocol.cpp</FileName>
+              <FileName>dc_motor.cpp</FileName>
               <FileType>8</FileType>
-              <FilePath>../FrameComponets/Mods/Src/nova_protocol.cpp</FilePath>
+              <FilePath>../FrameComponets/Mods/Src/dc_motor.cpp</FilePath>
             </File>
             <File>
               <FileName>gray_sensor.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/gray_sensor.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>gray_yahboom_8lp.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/gray_yahboom_8lp.cpp</FilePath>
             </File>
             <File>
               <FileName>led.cpp</FileName>
@@ -762,6 +762,16 @@
               <FilePath>../FrameComponets/Mods/Src/motor_pwm_driver.cpp</FilePath>
             </File>
             <File>
+              <FileName>nova_protocol.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/nova_protocol.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>oled_factory.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/oled_factory.cpp</FilePath>
+            </File>
+            <File>
               <FileName>std_actuator.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/std_actuator.cpp</FilePath>
@@ -772,24 +782,14 @@
               <FilePath>../FrameComponets/Mods/Src/std_sensor.cpp</FilePath>
             </File>
             <File>
-              <FileName>ultrasonic.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Mods/Src/ultrasonic.cpp</FilePath>
-            </File>
-            <File>
               <FileName>ultrasonic_factory.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/ultrasonic_factory.cpp</FilePath>
             </File>
             <File>
-              <FileName>gray_yahboom_8lp.cpp</FileName>
+              <FileName>ultrasonic.cpp</FileName>
               <FileType>8</FileType>
-              <FilePath>../FrameComponets/Mods/Src/gray_yahboom_8lp.cpp</FilePath>
-            </File>
-            <File>
-              <FileName>oled_factory.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Mods/Src/oled_factory.cpp</FilePath>
+              <FilePath>../FrameComponets/Mods/Src/ultrasonic.cpp</FilePath>
             </File>
           </Files>
         </Group>
@@ -832,29 +832,9 @@
           <GroupName>Frame/Apps</GroupName>
           <Files>
             <File>
-              <FileName>MainFrame.cpp</FileName>
+              <FileName>gray_8lp_example.cpp</FileName>
               <FileType>8</FileType>
-              <FilePath>../FrameComponets/Apps/Src/MainFrame.cpp</FilePath>
-            </File>
-            <File>
-              <FileName>NovaLink.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Apps/Src/NovaLink.cpp</FilePath>
-            </File>
-            <File>
-              <FileName>MotorContinuousTest.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Apps/Src/MotorContinuousTest.cpp</FilePath>
-            </File>
-            <File>
-              <FileName>MotorProtection.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Apps/Src/MotorProtection.cpp</FilePath>
-            </File>
-            <File>
-              <FileName>OffroadApp.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>../FrameComponets/Apps/Src/OffroadApp.cpp</FilePath>
+              <FilePath>../FrameComponets/Apps/Src/gray_8lp_example.cpp</FilePath>
             </File>
             <File>
               <FileName>LineFollowApp.cpp</FileName>
@@ -867,9 +847,29 @@
               <FilePath>../FrameComponets/Apps/Src/LineFollowBoard.cpp</FilePath>
             </File>
             <File>
+              <FileName>MainFrame.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/MainFrame.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>MotorProtection.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/MotorProtection.cpp</FilePath>
+            </File>
+            <File>
               <FileName>MotorSpeedDisplay.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Apps/Src/MotorSpeedDisplay.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>NovaLink.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/NovaLink.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>OffroadApp.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/OffroadApp.cpp</FilePath>
             </File>
             <File>
               <FileName>SpeedMixer.cpp</FileName>
@@ -913,24 +913,19 @@
             </File>
           </Files>
         </Group>
-        <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
       </Groups>
     </Target>
   </Targets>
-
   <RTE>
-    <apis/>
+    <apis />
     <components>
       <component Cclass="CMSIS" Cgroup="CORE" Cvendor="ARM" Cversion="5.4.0" condition="ARMv6_7_8-M Device">
-        <package name="CMSIS" schemaVersion="1.3" url="http://www.keil.com/pack/" vendor="ARM" version="5.7.0"/>
+        <package name="CMSIS" schemaVersion="1.3" url="http://www.keil.com/pack/" vendor="ARM" version="5.7.0" />
         <targetInfos>
-          <targetInfo name="jiangsu_robot_offroad_2026"/>
+          <targetInfo name="jiangsu_robot_offroad_2026" />
         </targetInfos>
       </component>
     </components>
-    <files/>
+    <files />
   </RTE>
-
 </Project>

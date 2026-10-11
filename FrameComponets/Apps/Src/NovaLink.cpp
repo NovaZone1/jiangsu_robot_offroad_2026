@@ -9,10 +9,15 @@ namespace
 {
     DcMotor *const motors[] = {&Motor1, &Motor2, &Motor3, &Motor4};
 
+    DcMotor &TrialMotor()
+    {
+        return *motors[NovaLinkApp::TuningIndex];
+    }
+
     bool Stopped()
     {
         if (System.GetState() == Systems::WORKING ||
-            (!NovaLinkApp::M1TuningEnabled && MotorSafety.IsCoasting()))
+            (!NovaLinkApp::MotorTuningEnabled && MotorSafety.IsCoasting()))
         {
             return false;
         }
@@ -26,6 +31,22 @@ namespace
         return true;
     }
 } // namespace
+
+bool NovaLinkApp::InitMonitor(uint8_t channel, void (*stop)())
+{
+    if (channel < 1 || channel > 4 || !stop)
+    {
+        return false;
+    }
+    if (initialized_)
+    {
+        return monitor_only_ && monitor_channel_ == channel && monitor_stop_ == stop;
+    }
+    monitor_only_ = true;
+    monitor_channel_ = channel;
+    monitor_stop_ = stop;
+    return Init();
+}
 
 bool NovaLinkApp::Init()
 {
@@ -63,7 +84,12 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
     // STOP is always honored, including fault states; it never clears a protection latch.
     if (request.command == Command::Stop)
     {
-        if (M1TuningEnabled)
+        if (self.monitor_only_)
+        {
+            self.monitor_stop_(); // Also latches a STOP received during the startup delay.
+            return true;
+        }
+        if (MotorTuningEnabled)
         {
             self.StopTrial();
             return true;
@@ -76,6 +102,19 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
             motor->Disable();
         }
         return true;
+    }
+    if (self.monitor_only_)
+    {
+        if (request.channel != self.monitor_channel_)
+        {
+            reply.error = "monitor_channel_only";
+            return false;
+        }
+        if (request.command != Command::Hello && request.command != Command::Get)
+        {
+            reply.error = "monitor_only";
+            return false;
+        }
     }
     const bool motor_channel = request.channel <= 4;
     DcMotor *motor = motor_channel ? motors[request.channel - 1U] : nullptr;
@@ -91,12 +130,12 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
     }
     if (request.command == Command::SetPid)
     {
-        if (M1TuningEnabled && request.channel != 1)
+        if (MotorTuningEnabled && request.channel != TuningPort)
         {
-            reply.error = "m1_only";
+            reply.error = "selected_motor_only";
             return false;
         }
-        if (M1TuningEnabled && (self.trial_fault_ || System.GetState() == Systems::ERROR))
+        if (MotorTuningEnabled && (self.trial_fault_ || System.GetState() == Systems::ERROR))
         {
             reply.error = self.trial_fault_ ? self.trial_fault_ : "system_fault";
             return false;
@@ -124,7 +163,7 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
             config.kp = g.kp;
             config.ki = g.ki;
             config.kd = g.kd;
-            if (M1TuningEnabled)
+            if (MotorTuningEnabled)
             {
                 config.derivative_on_measurement = true;
             }
@@ -163,8 +202,19 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
     }
     // Existing PidGeneral differentiates error. Never advertise Nova's different D-on-PV model.
     reply.algorithm = "positional_pid_d_on_error";
-    reply.capabilities = NovaProtocol::SetPid | NovaProtocol::Stop;
-    if (M1TuningEnabled && request.channel == 1)
+    reply.capabilities = NovaProtocol::Stop;
+    if (!MotorTuningEnabled || request.channel == TuningPort)
+    {
+        reply.capabilities |= NovaProtocol::SetPid;
+    }
+    if (self.monitor_only_)
+    {
+        reply.algorithm = motor->GetSpeedPidConfig().derivative_on_measurement
+                              ? "positional_pid_d_on_measurement"
+                              : "positional_pid_d_on_error";
+        reply.capabilities = NovaProtocol::Stop;
+    }
+    else if (MotorTuningEnabled && request.channel == TuningPort)
     {
         reply.algorithm = "positional_pid_d_on_measurement";
         reply.capabilities |=
@@ -175,7 +225,7 @@ bool NovaLinkApp::Execute(void *context, const NovaProtocol::Request &request,
 
 void NovaLinkApp::StopTrial()
 {
-    const bool moving_trial = trial_started_ || Motor1.IsEnabled();
+    const bool moving_trial = trial_started_ || TrialMotor().IsEnabled();
     System.Stop(System.GetState() == Systems::ERROR ||
                 MotorSafety.GetStatus().fault != MotorProtection::Fault::None);
     for (auto motor : motors)
@@ -201,12 +251,16 @@ void NovaLinkApp::FailTrial(const char *reason)
 
 void NovaLinkApp::CheckTrial()
 {
-    if (!M1TuningEnabled)
+    if (monitor_only_ || !MotorTuningEnabled)
     {
         return;
     }
-    for (unsigned i = 1; i < 4; ++i)
+    for (unsigned i = 0; i < 4; ++i)
     {
+        if (i == TuningIndex)
+        {
+            continue;
+        }
         if (motors[i]->IsEnabled() && configured_)
         {
             FailTrial("other_motor_enabled");
@@ -220,17 +274,17 @@ void NovaLinkApp::CheckTrial()
     }
     if (trial_fault_)
     {
-        Motor1.Disable();
+        TrialMotor().Disable();
         if (!trial_fault_sent_)
         {
-            trial_fault_sent_ = protocol_.Fault(1, trial_fault_);
+            trial_fault_sent_ = protocol_.Fault(TuningPort, trial_fault_);
         }
         return;
     }
     const uint32_t now = HAL_GetTick();
     if (configured_ && (uint32_t)(now - heartbeat_tick_) >= watchdog_ms_)
     {
-        if (trial_started_ || Motor1.IsEnabled())
+        if (trial_started_ || TrialMotor().IsEnabled())
         {
             FailTrial("heartbeat_timeout");
         }
@@ -242,7 +296,7 @@ void NovaLinkApp::CheckTrial()
     }
     if (!configured_)
     {
-        Motor1.Disable();
+        TrialMotor().Disable();
         return;
     }
     if (trial_started_ && (uint32_t)(now - trial_tick_) >= 45000U)
@@ -250,19 +304,19 @@ void NovaLinkApp::CheckTrial()
         FailTrial("trial_timeout");
         return;
     }
-    if (!Motor1.IsOnline() || Motor1.GetFault() != DcMotor::Fault::None)
+    if (!TrialMotor().IsOnline() || TrialMotor().GetFault() != DcMotor::Fault::None)
     {
         FailTrial("feedback_or_driver_fault");
         return;
     }
-    const float raw = Motor1.GetMeasure().speed_rpm;
-    const float filtered = Motor1.GetFilteredRpm();
+    const float raw = TrialMotor().GetMeasure().speed_rpm;
+    const float filtered = TrialMotor().GetFilteredRpm();
     if (raw < actual_min_ || raw > actual_max_ || filtered < actual_min_ || filtered > actual_max_)
     {
         FailTrial("actual_limit");
         return;
     }
-    if (Motor1.IsEnabled() && !Motor1.SetSpeed(Motor1.GetTargetSpeed()))
+    if (TrialMotor().IsEnabled() && !TrialMotor().SetSpeed(TrialMotor().GetTargetSpeed()))
     {
         FailTrial("target_refresh_failed");
     }
@@ -277,9 +331,9 @@ void NovaLinkApp::AfterControl()
 bool NovaLinkApp::TrialCommand(const NovaProtocol::Request &request, NovaProtocol::Reply &reply)
 {
     using Command = NovaProtocol::Command;
-    if (!M1TuningEnabled || request.channel != 1)
+    if (!MotorTuningEnabled || request.channel != TuningPort)
     {
-        reply.error = "m1_tuning_only";
+        reply.error = "selected_motor_tuning_only";
         return false;
     }
     if (trial_fault_ || MotorSafety.GetStatus().fault != MotorProtection::Fault::None ||
@@ -305,15 +359,16 @@ bool NovaLinkApp::TrialCommand(const NovaProtocol::Request &request, NovaProtoco
             reply.error = "unsafe_limits";
             return false;
         }
-        if (!Motor1.IsOnline())
+        if (!TrialMotor().IsOnline())
         {
             reply.error = "feedback_not_ready";
             return false;
         }
-        auto config = Motor1.GetSpeedPidConfig();
+        auto config = TrialMotor().GetSpeedPidConfig();
         config.derivative_on_measurement = true;
         config.integral_limit = request.output_limit;
-        if (!Motor1.ConfigureSpeedPid(config) || !Motor1.DutyLimSet(request.output_limit))
+        if (!TrialMotor().ConfigureSpeedPid(config) ||
+            !TrialMotor().DutyLimSet(request.output_limit))
         {
             reply.error = "configuration_failed";
             return false;
@@ -350,11 +405,11 @@ bool NovaLinkApp::TrialCommand(const NovaProtocol::Request &request, NovaProtoco
     if (request.value == 0)
     {
         // Zero target is neutral, never active braking. Retain the trial deadline.
-        if (Motor1.IsEnabled() && !MotorSafety.IsCoasting())
+        if (TrialMotor().IsEnabled() && !MotorSafety.IsCoasting())
         {
             MotorSafety.RequestCoastStop();
         }
-        Motor1.Disable();
+        TrialMotor().Disable();
     }
     else
     {
@@ -363,14 +418,14 @@ bool NovaLinkApp::TrialCommand(const NovaProtocol::Request &request, NovaProtoco
             reply.error = "waiting_for_standstill";
             return false;
         }
-        if (Motor1.IsEnabled() && Motor1.GetTargetSpeed() * request.value < 0)
+        if (TrialMotor().IsEnabled() && TrialMotor().GetTargetSpeed() * request.value < 0)
         {
             reply.error = "stop_before_reverse";
             return false;
         }
-        if (!Motor1.IsEnabled())
+        if (!TrialMotor().IsEnabled())
         {
-            if (!Motor1.IsOnline() || fabsf(Motor1.GetMeasure().speed_rpm) >= 6)
+            if (!TrialMotor().IsOnline() || fabsf(TrialMotor().GetMeasure().speed_rpm) >= 6)
             {
                 reply.error = "not_stationary";
                 return false;
@@ -380,13 +435,13 @@ bool NovaLinkApp::TrialCommand(const NovaProtocol::Request &request, NovaProtoco
                 reply.error = "coast_interlock";
                 return false;
             }
-            if (!Motor1.Enable())
+            if (!TrialMotor().Enable())
             {
                 reply.error = "enable_failed";
                 return false;
             }
         }
-        if (!Motor1.SetSpeed(request.value))
+        if (!TrialMotor().SetSpeed(request.value))
         {
             FailTrial("set_target_failed");
             reply.error = "set_target_failed";
@@ -442,9 +497,14 @@ void NovaLinkApp::Service()
     if ((uint32_t)(now - last_publish_) >= 20U)
     {
         last_publish_ = now;
-        if (M1TuningEnabled)
+        if (monitor_only_)
         {
-            Publish(1); // 50 Hz for M1: leave UART/BLE capacity for ACK and heartbeat.
+            Publish(monitor_channel_); // Read actual feedback; never generates motor commands.
+        }
+        else if (MotorTuningEnabled)
+        {
+            Publish(TuningPort); // 50 Hz for the selected motor: leave UART/BLE capacity for ACK
+                                 // and heartbeat.
         }
         else
         {

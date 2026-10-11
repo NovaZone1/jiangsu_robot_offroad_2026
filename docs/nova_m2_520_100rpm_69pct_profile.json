@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "config": {
+    "gain_min": {
+      "kp": 0.0002,
+      "ki": 0.001,
+      "kd": 0
+    },
+    "gain_max": {
+      "kp": 0.01,
+      "ki": 0.05,
+      "kd": 0
+    },
+    "safety": {
+      "actual_min": -120,
+      "actual_max": 150,
+      "output_abs_max": 0.69,
+      "max_overshoot_percent": 40,
+      "max_relative_gain_change": 0.2,
+      "max_absolute_gain_change": {
+        "kp": 0.0002,
+        "ki": 0.001,
+        "kd": 0
+      },
+      "telemetry_timeout": 1,
+      "saturation_seconds": 1
+    },
+    "capture_seconds": 5,
+    "sample_period_seconds": 0.01,
+    "max_trials": 8,
+    "settling_tolerance_percent": 2.0,
+    "minimum_step": 10,
+    "minimum_samples": 50,
+    "weight_iae": 0.4,
+    "weight_overshoot": 0.25,
+    "weight_settling": 0.2,
+    "weight_steady_error": 0.1,
+    "weight_output_variation": 0.05,
+    "settling_hold_seconds": 0.5,
+    "channel": 2,
+    "mode": "PI",
+    "locked": [
+      false,
+      false,
+      true
+    ],
+    "gain_resolution": {
+      "kp": 1e-06,
+      "ki": 1e-06,
+      "kd": 1e-06
+    },
+    "initial_target": 0,
+    "step_target": 100,
+    "stable_tolerance": 3,
+    "stable_seconds": 1.2,
+    "stability_timeout": 8,
+    "pre_seconds": 1,
+    "patience": 3,
+    "target_score": 0.0,
+    "device_name": "520 M2 left rear / 30:1 / 1320 CPR / 69%",
+    "unit": "RPM",
+    "algorithm": "positional_pid_d_on_measurement"
+  },
+  "gains": {
+    "kp": 0.0012,
+    "ki": 0.008,
+    "kd": 0
+  }
+}

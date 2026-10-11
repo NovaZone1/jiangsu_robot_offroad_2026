@@ -4,12 +4,10 @@
 #include "LineFollowBoard.hpp"
 #include "ultrasonic_factory.hpp"
 #include "NovaLink.hpp"
-#include "MotorContinuousTest.hpp"
 
 MotorPwmDriver Motor1Driver, Motor2Driver, Motor3Driver, Motor4Driver;
 DcMotor Motor1, Motor2, Motor3, Motor4;
 MotorProtection MotorSafety(Motor1, Motor2, Motor3, Motor4);
-MotorContinuousTest MotorBench(Motor1, Motor2, Motor3, Motor4, MotorSafety);
 MotorPwmDriver &LeftMotorDriver = Motor1Driver;
 MotorPwmDriver &RightMotorDriver = Motor3Driver;
 DcMotor &LeftMotor = Motor1;
@@ -72,15 +70,12 @@ namespace
         {
             return false;
         }
-        if (MotorContinuousTest::Enabled)
+        if (NovaLinkApp::MotorTuningEnabled)
         {
-            return true; // Local test configures only its selected motor after binding.
-        }
-        if (NovaLinkApp::M1TuningEnabled)
-        {
-            auto pid = Motor1.GetSpeedPidConfig();
+            auto &motor = *motors[NovaLinkApp::TuningIndex];
+            auto pid = motor.GetSpeedPidConfig();
             pid.derivative_on_measurement = true;
-            if (!Motor1.ConfigureSpeedPid(pid))
+            if (!motor.ConfigureSpeedPid(pid))
             {
                 return false;
             }
@@ -132,7 +127,7 @@ void MainFrameCpp()
 {
     System.BindStopHandler(StopAll);
     System.BindIndicator(SetIndicator);
-    if (!MotorContinuousTest::Enabled && !NovaLink.Init())
+    if (!NovaLink.Init())
     {
         System.monitor.LogError("USART1 Bluetooth initialization failed");
     }
@@ -142,18 +137,10 @@ void MainFrameCpp()
         System.Stop(true);
         return;
     }
-    if (MotorContinuousTest::Enabled)
+    if (NovaLinkApp::MotorTuningEnabled)
     {
-        System.Stop();
-        if (!MotorBench.Init())
-        {
-            System.Stop(true);
-        }
-        return;
-    }
-    if (NovaLinkApp::M1TuningEnabled)
-    {
-        System.Stop(); // Explicitly idle; only Nova's bounded M1 trial may enable a wheel.
+        System
+            .Stop(); // Explicitly idle; only Nova's selected single-motor trial may enable a wheel.
         return;
     }
     Application &app = LineFollowBoard::Enabled ? static_cast<Application &>(LineFollow)

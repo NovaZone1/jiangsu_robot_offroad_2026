@@ -1,5 +1,7 @@
 # USART1 蓝牙与 Nova 接入
 
+> 当前为四轮 PID 清理版，上电禁能，Nova AI 试转默认关闭。参数与验证见 [四轮记录](motor_pid_20261011.md)。
+
 > 更新：用户实际模块已确认是 DX-BT24 BLE 5.1，已扫描并完成 BLE 双向参数查询。
 > 本机通过 [BLE 桥接程序](../tools/ble_bridge/README.md) 接入；桥接用 COM11，Nova 选择 COM12。
 > 不需要在 Windows 配对页面创建蓝牙串口，也不使用 DAPLink 的 COM5。
@@ -10,11 +12,11 @@
 支持 Nova 普通 PID 页的整组/单参数下发、参数读回，以及新版 Nova v2 的带时间戳曲线、通道、ACK 和停车。
 上电不试转，不因连接或修改 PID 而启动电机。原电机保护保留；调参模式不运行比赛应用。
 
-当前默认固件已补齐 **M1 单轮 AI 调参**：只有通道 1 开放 configure / heartbeat / set_target，
-使用 D-on-measurement、10 ms 控制周期，并保留电机保护和停稳互锁。
-M2～M4 持续禁能，比赛应用暂停；循迹自动调参尚未开放。
-完整步骤和限幅见 [M1 调参说明](nova_m1_tuning.md)，导入 [520 M1 档案](nova_m1_520_profile.json)。
-`NOVA_M1_TUNING=0` 时恢复原比赛调度与 D-on-error 参数接口，拒绝远程试转。
+当前 `NOVA_MOTOR_TUNING=0`，运行原比赛应用调度，拒绝远程 configure / heartbeat / set_target。
+仍可查看 CH1～CH4 转速、查询参数、停车；参数写入要求电机已禁能。连接和参数写入不启动电机。
+如以后需要重新单轮调参，须显式设置 `NOVA_MOTOR_TUNING=1` 和 `NOVA_TUNING_PORT=1..4`，
+重新编译并核对所选轮、档案、限幅与已保存增益；原保护及其他三轮禁能约束仍生效。
+历史操作说明保留供参考，自动持续试转类仅作为电脑回归夹具，不再提供生产固件启动开关。
 
 参考的是 Nova `main` 提交
 [`a0de0488e37597d41cea9bde2aa15752a418261c`](https://github.com/zwj051029/Nova/tree/a0de0488e37597d41cea9bde2aa15752a418261c)，

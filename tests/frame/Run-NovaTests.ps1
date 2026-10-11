@@ -29,3 +29,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Nova protocol tests failed' }
 & (Join-Path $PSScriptRoot 'Run-NovaLinkTests.ps1') -Compiler $Compiler
 
 & (Join-Path $PSScriptRoot 'Run-NovaM1Tests.ps1') -Compiler $Compiler
+
+& (Join-Path $PSScriptRoot 'Run-NovaM1Tests.ps1') -Compiler $Compiler -TuningPort 3
+
+& (Join-Path $PSScriptRoot 'Run-NovaM1Tests.ps1') -Compiler $Compiler -TuningPort 2
+
+& (Join-Path $PSScriptRoot 'Run-NovaM1Tests.ps1') -Compiler $Compiler -TuningPort 4

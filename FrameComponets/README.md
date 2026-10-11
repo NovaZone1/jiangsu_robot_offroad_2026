@@ -1,14 +1,12 @@
 # STM32F103ZE 越野比赛框架
 
-> 当前临时选择 M3 本地持续 150 RPM 测试：复位后约 2 秒自动启动右前轮，其他轮禁能。
-> `MOTOR_CONTINUOUS_TEST=1` 优先于 Nova，保留原保护，详见 [测试说明](../docs/motor_continuous_test.md)。
-> 下文的原清理版/上电禁能说明适用于关闭本地测试宏后；本地模式不启动蓝牙通信。
-> 本地测试宏设为 0 后，恢复 M1 单轮 Nova AI 调参模式，M2～M4 禁能，比赛应用暂不运行。
-> 开关 `NOVA_M1_TUNING` 与恢复比赛的方法见 [M1 调参说明](../docs/nova_m1_tuning.md)。
+> 当前交付四轮 PID 清理版，上电禁能，自动持续试转入口已删除。
+> 四轮已调正转 PID、69% PWM/积分限幅及原保护保留，见 [参数与实测总表](../docs/motor_pid_20261011.md)。
+> Nova 通信保留，`NOVA_MOTOR_TUNING=0` 默认关闭 AI 试转；启动仍由正式应用管理。
 
 > 临时电机、灰度、超声波测试入口已从固件清理，驱动与保护保留；主机夹具仅用于回归。
 > 当前电机为 520、30:1、11 线，输出轴 1320 计数/圈，四路单轮测试及灰度测试已获用户确认。
-> 原循迹框架恢复，上电禁能；启动仍需要校准、自检和显式请求。初始 PI 尚未正式调参。
+> 原循迹框架恢复，上电禁能；启动仍需要校准、自检和显式请求。四轮正转 PI 已完成 100 RPM 单轮台架调参；反转与整车负载仍待验证。
 > 方向、无转速、超速、超时和停车等待由正式 [MotorProtection](../docs/motor_protection.md) 保留。
 > 原厂超声波绑定和 OLED/灰度驱动保留，比赛策略联合验证尚未完成。
 > USART1 已接入 115200 蓝牙 DMA 与 Nova 参数/曲线接口，使用步骤及自动调参边界见 [蓝牙与 Nova](../docs/bluetooth_nova.md)。
@@ -41,7 +39,7 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Mods | ultrasonic、gray_sensor | 模块接口和实现位置，硬件采集驱动待编写；未绑定时不伪造就绪状态 |
 | Sys | StateCore、Action | 移植状态图、状态切换、动作超时/取消及非阻塞等待；修正当前状态复制、空图和空指针问题 |
 | Sys | Application、System、Monitor、RtosCpp、SysDefs | 应用生命周期独立于系统调度；保留注册、自检、日志和任务桥接，使用 F103 比赛配置和单线程框架调度 |
-| Apps | MainFrame、MotorSpeedProfiles、MotorProtection、OffroadApp | 板级绑定、初始 PI、正式电机保护及比赛策略扩展位置 |
+| Apps | MainFrame、MotorSpeedProfiles、MotorProtection、OffroadApp | 板级绑定、四轮 PI 参数、正式电机保护及比赛策略扩展位置 |
 
 `Libs → Bsps`；Algorithm 为独立层，算法头文件位于 `Algorithm/Inc`，
 源文件位于 `Algorithm/Src`，原 Bsps 下的三个算法已经迁回 Algorithm，避免重复编译。

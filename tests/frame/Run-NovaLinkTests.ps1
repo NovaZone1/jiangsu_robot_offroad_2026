@@ -1,7 +1,7 @@
 param([string]$Compiler = 'g++')
 $ErrorActionPreference = 'Stop'
 $taskRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-$taskArgs = @('-std=c++11','-Wall','-Wextra','-Werror','-DNOVA_M1_TUNING=0','-I',"$PSScriptRoot/mocks")
+$taskArgs = @('-std=c++11','-Wall','-Wextra','-Werror','-I',"$PSScriptRoot/mocks")
 foreach ($taskLayer in @('Bsps','Mods','Apps','Sys','Algorithm')) {
     $taskArgs += @('-I',"$taskRoot/FrameComponets/$taskLayer/Inc")
 }

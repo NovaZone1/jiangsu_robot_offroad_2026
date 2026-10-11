@@ -22,6 +22,7 @@ static std::string input;
 static std::vector<std::string> output;
 static DcMotor *const motors[] = {&Motor1, &Motor2, &Motor3, &Motor4};
 static float rpm;
+static_assert(!NovaLinkApp::MotorTuningEnabled, "Production must default to disabled AI trials");
 
 extern "C" uint8_t BspUart1Dma_Init(uint32_t baud)
 {
@@ -105,10 +106,15 @@ int main()
         *value = rpm;
         return true;
     };
+    const float expected_kp[] = {.000957f, .001329f, .001176f, .001442f};
+    const float expected_ki[] = {.009191f, .010857f, .013926f, .010392f};
     for (uint8_t i = 0; i < 4; ++i)
     {
         assert(motors[i]->Init(driver));
         assert(MotorSpeedProfiles::Apply(*motors[i], i + 1U, false));
+        const auto pid = motors[i]->GetSpeedPidConfig();
+        assert(pid.kp == expected_kp[i] && pid.ki == expected_ki[i] && pid.kd == 0);
+        assert(pid.integral_limit == .69f && !motors[i]->IsEnabled());
     }
     assert(MotorSafety.Init());
     assert(LineFollow.Init(LineFollowApp::Config()));
@@ -120,11 +126,22 @@ int main()
            response.find("set_target") == std::string::npos);
     response = Command(
         "@{\"type\":\"command\",\"id\":\"t-2\",\"cmd\":\"set_target\",\"channel\":1,\"value\":60}");
-    assert(response.find("m1_tuning_only") != std::string::npos);
+    assert(response.find("selected_motor_tuning_only") != std::string::npos);
     assert(!Motor1.IsEnabled());
+    for (uint8_t port = 1; port <= 4; ++port)
+    {
+        const std::string channel = std::to_string(port);
+        response = Command("@{\"type\":\"command\",\"id\":\"idle-" + channel +
+                           "\",\"cmd\":\"set_target\",\"channel\":" + channel + ",\"value\":100}");
+        assert(response.find("selected_motor_tuning_only") != std::string::npos);
+        for (auto motor : motors)
+        {
+            assert(!motor->IsEnabled() && motor->GetDuty() == 0);
+        }
+    }
     assert(Command("LOOP:2") == "OK:LOOP:2\r\n");
     assert(Command("PID:0.002,0.01,0.0001") == "OK:PID\r\n");
-    assert(Motor2.GetSpeedPidConfig().kp == .002f && Motor1.GetSpeedPidConfig().kp == .0012f);
+    assert(Motor2.GetSpeedPidConfig().kp == .002f && Motor1.GetSpeedPidConfig().kp == .000957f);
     assert(Motor2.GetSpeedPidConfig().feedback_filter_tau_s == .03f);
     assert(Command("PID:Kp=1").find("gain_limit") != std::string::npos);
     assert(Motor2.Enable());

@@ -2,19 +2,13 @@
 
 #include "MotorProtection.hpp"
 
-#ifndef MOTOR_CONTINUOUS_TEST
-#define MOTOR_CONTINUOUS_TEST 1
-#endif
-
-// Temporary local bench mode. Takes exclusive ownership before Nova/competition dispatch.
+// Host-only regression fixture for historical bench behavior. Never compile into firmware.
 class MotorContinuousTest
 {
 public:
-    static constexpr bool Enabled = MOTOR_CONTINUOUS_TEST != 0;
-    static constexpr float TargetRpm = 150.0f;
-    static constexpr float DutyLimit = 0.5f;
-    static constexpr uint8_t SelectedPort =
-        3; // M3 right front; physical port numbering stays 1..4.
+    static constexpr float TargetRpm = 100.0f;
+    static constexpr float DutyLimit = 0.69f;
+    static constexpr uint8_t SelectedPort = 4; // M4 right rear; physical port numbering stays 1..4.
     static constexpr uint8_t SelectedIndex = SelectedPort - 1;
     static_assert(SelectedPort >= 1 && SelectedPort <= 4, "Invalid test motor port");
     enum class Phase

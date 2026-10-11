@@ -1,4 +1,4 @@
-"""Run the unmodified Nova automatic tuner against the real C++ M1 controller, no hardware."""
+"""Run the unmodified Nova automatic tuner against the real C++ single-motor controller, no hardware."""
 import argparse
 import collections
 import json
@@ -8,6 +8,7 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nova-root", type=Path, required=True)
+parser.add_argument("--port", type=int, choices=(1,2,3,4), default=1)
 args = parser.parse_args()
 sys.path.insert(0, str(args.nova_root))
 from tuning.automatic import AutomaticTuner
@@ -15,7 +16,13 @@ from tuning.models import PIDGains
 from tuning.storage import config_from_dict
 
 root = Path(__file__).resolve().parents[2]
-profile = json.loads((root / "docs/nova_m1_520_profile.json").read_text())
+profile_name = {
+    1: "nova_m1_520_tuned_100rpm_69pct_profile.json",
+    2: "nova_m2_520_100rpm_69pct_profile.json",
+    3: "nova_m3_520_tuned_100rpm_69pct_profile.json",
+    4: "nova_m4_520_100rpm_69pct_profile.json",
+}[args.port]
+profile = json.loads((root / "docs" / profile_name).read_text(encoding="utf-8"))
 config = config_from_dict(profile["config"])
 pending = collections.deque()
 clock = [0.02]
@@ -26,7 +33,7 @@ def status(state, message):
     print(state, message)
 
 tuner = AutomaticTuner(config, pending.append, clock=lambda: clock[0], on_status=status)
-process = subprocess.Popen([str(root / "tests/frame/out/nova_m1_tests.exe"), "--server"],
+process = subprocess.Popen([str(root / f"tests/frame/out/nova_m{args.port}_tests.exe"), "--server"],
                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8")
 enabled = False
 
@@ -63,7 +70,7 @@ try:
     assert len(tuner.session.history) >= 3
     assert states.count("applying") >= 3
     print("PASS: real Nova handshake, heartbeat, multi-trial stop/restart, verification and accept;")
-    print("      M2-M4 remained disabled. Plant is simulated, gains are not hardware tuning results.")
+    print(f"      Only M{args.port} ran; other motors remained disabled. Simulated plant, not hardware gains.")
 finally:
     process.stdin.close()
     try:

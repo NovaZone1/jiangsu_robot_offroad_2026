@@ -14,7 +14,7 @@
     "safety": {
       "actual_min": -120,
       "actual_max": 150,
-      "output_abs_max": 0.5,
+      "output_abs_max": 0.69,
       "max_overshoot_percent": 40,
       "max_relative_gain_change": 0.2,
       "max_absolute_gain_change": {
@@ -37,7 +37,7 @@
     "weight_steady_error": 0.1,
     "weight_output_variation": 0.05,
     "settling_hold_seconds": 0.5,
-    "channel": 1,
+    "channel": 4,
     "mode": "PI",
     "locked": [
       false,
@@ -50,14 +50,14 @@
       "kd": 1e-06
     },
     "initial_target": 0,
-    "step_target": 60,
+    "step_target": 100,
     "stable_tolerance": 3,
     "stable_seconds": 1.2,
     "stability_timeout": 8,
     "pre_seconds": 1,
     "patience": 3,
     "target_score": 0.0,
-    "device_name": "520 M1 bench / 30:1 / 1320 CPR",
+    "device_name": "520 M4 right rear / 30:1 / 1320 CPR / 69%",
     "unit": "RPM",
     "algorithm": "positional_pid_d_on_measurement"
   },
