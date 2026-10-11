@@ -47,6 +47,7 @@ public:
         float integral_limit = 0.25f; // 占空比单位
         float derivative_filter = 0.9f;
         float feedback_filter_tau_s = 0; // 0 不滤波；只滤闭环输入，原始 Measure 保留。
+        bool derivative_on_measurement = false; // Nova tuning: no derivative kick on target steps.
     };
 
     DcMotor() = default;
@@ -84,6 +85,7 @@ public:
     float GetDuty() const;
     float GetTargetSpeed() const;
     float GetFilteredRpm() const;
+    const SpeedPidConfig &GetSpeedPidConfig() const;
 
 private:
     bool Register();
@@ -95,6 +97,7 @@ private:
     Driver driver_ = {};
     Measure measure_;
     PidGeneral speed_pid_;
+    SpeedPidConfig speed_pid_config_;
     Mode mode_ = Mode::Duty;
     Fault fault_ = Fault::None;
     bool enabled_ = false;
@@ -112,6 +115,7 @@ private:
     float feedback_filter_tau_s_ = 0;
     float filtered_rpm_ = 0;
     bool filter_valid_ = false;
+    float measurement_integral_ = 0, previous_pv_ = 0, measurement_derivative_ = 0;
 };
 
 using MotorPWM = DcMotor;

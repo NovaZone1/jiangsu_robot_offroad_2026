@@ -213,3 +213,35 @@ SpeedMixer &LineFollowApp::GetSpeedMixer()
 {
     return mixer_;
 }
+
+const Track::Config &LineFollowApp::GetTrackConfig() const
+{
+    return config_.track;
+}
+
+bool LineFollowApp::ConfigureTrackPid(float kp, float ki, float kd)
+{
+    if (!initialized_ || running_ || System.GetState() == Systems::WORKING || !isfinite(kp) ||
+        !isfinite(ki) || !isfinite(kd) || kp < 0 || kp > 100 || ki < 0 || ki > 100 || kd < 0 ||
+        kd > 10)
+    {
+        return false;
+    }
+    for (DcMotor *motor : motors_)
+    {
+        if (motor->IsEnabled())
+        {
+            return false;
+        }
+    }
+    Track::Config next = config_.track;
+    next.kp = kp;
+    next.ki = ki;
+    next.kd = kd;
+    if (!track_.Init(next))
+    {
+        return false;
+    }
+    config_.track = next;
+    return true;
+}

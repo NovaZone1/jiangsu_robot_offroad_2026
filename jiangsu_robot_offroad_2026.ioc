@@ -1,4 +1,6 @@
 #MicroXplorer Configuration settings - do not modify
+# BSP-owned: USART1 PA9 TX/PA10 RX, DMA1 CH4 TX/CH5 circular RX, 115200 8N1.
+# Initialized by bsp_uart1_dma.c; do not generate duplicate UART/DMA init or IRQ handlers.
 CAD.formats=
 CAD.pinconfig=
 CAD.provider=

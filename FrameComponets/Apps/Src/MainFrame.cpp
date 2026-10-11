@@ -3,10 +3,13 @@
 #include "MotorSpeedProfiles.hpp"
 #include "LineFollowBoard.hpp"
 #include "ultrasonic_factory.hpp"
+#include "NovaLink.hpp"
+#include "MotorContinuousTest.hpp"
 
 MotorPwmDriver Motor1Driver, Motor2Driver, Motor3Driver, Motor4Driver;
 DcMotor Motor1, Motor2, Motor3, Motor4;
 MotorProtection MotorSafety(Motor1, Motor2, Motor3, Motor4);
+MotorContinuousTest MotorBench(Motor1, Motor2, Motor3, Motor4, MotorSafety);
 MotorPwmDriver &LeftMotorDriver = Motor1Driver;
 MotorPwmDriver &RightMotorDriver = Motor3Driver;
 DcMotor &LeftMotor = Motor1;
@@ -69,6 +72,20 @@ namespace
         {
             return false;
         }
+        if (MotorContinuousTest::Enabled)
+        {
+            return true; // Local test configures only its selected motor after binding.
+        }
+        if (NovaLinkApp::M1TuningEnabled)
+        {
+            auto pid = Motor1.GetSpeedPidConfig();
+            pid.derivative_on_measurement = true;
+            if (!Motor1.ConfigureSpeedPid(pid))
+            {
+                return false;
+            }
+            return true; // Bench mode has no gray/ultrasonic startup dependency.
+        }
         if (!FactoryUltrasonic::Init(RangeSensor))
         {
             System.monitor.LogError("Factory ultrasonic initialization failed");
@@ -115,10 +132,28 @@ void MainFrameCpp()
 {
     System.BindStopHandler(StopAll);
     System.BindIndicator(SetIndicator);
+    if (!MotorContinuousTest::Enabled && !NovaLink.Init())
+    {
+        System.monitor.LogError("USART1 Bluetooth initialization failed");
+    }
 
     if (!BindHardware())
     {
         System.Stop(true);
+        return;
+    }
+    if (MotorContinuousTest::Enabled)
+    {
+        System.Stop();
+        if (!MotorBench.Init())
+        {
+            System.Stop(true);
+        }
+        return;
+    }
+    if (NovaLinkApp::M1TuningEnabled)
+    {
+        System.Stop(); // Explicitly idle; only Nova's bounded M1 trial may enable a wheel.
         return;
     }
     Application &app = LineFollowBoard::Enabled ? static_cast<Application &>(LineFollow)

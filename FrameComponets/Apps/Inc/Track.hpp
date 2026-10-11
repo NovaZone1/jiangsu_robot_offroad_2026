@@ -27,7 +27,9 @@ public:
         float search_diff_rpm = 18;
         float maximum_diff_rpm = 24;
         float kp = 28; // RPM per normalized line error.
-        float kd = 0.25f; // RPM seconds per normalized line error; Ki stays zero.
+        float kd = 0.25f; // RPM seconds per normalized line error.
+        float ki = 0; // Default behavior remains PD; integral output is bounded in RPM.
+        float integral_limit_rpm = 6;
         float error_filter_tau_s = 0.025f;
         bool white_line = true;
         uint8_t reacquire_samples = 3;
@@ -41,6 +43,7 @@ public:
         float base_rpm = 0;
         float speed_diff_rpm = 0; // Positive: left faster, steer right.
         float line_error = 0; // Left negative, right positive, normalized [-1,1].
+        uint32_t timestamp_ms = 0; // Last actual line sample, never refreshed by telemetry.
         State state = State::Disabled;
         bool valid = false;
     };

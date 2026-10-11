@@ -16,7 +16,9 @@ bool Track::Init(const Config &config)
     if (!Nonnegative(config.base_rpm) || !Nonnegative(config.turn_rpm) ||
         !Nonnegative(config.gap_rpm) || !Nonnegative(config.search_rpm) ||
         !Nonnegative(config.search_diff_rpm) || !Nonnegative(config.maximum_diff_rpm) ||
-        !Nonnegative(config.kp) || !Nonnegative(config.kd) ||
+        !Nonnegative(config.kp) || !Nonnegative(config.kd) || !Nonnegative(config.ki) ||
+        !Nonnegative(config.integral_limit_rpm) || config.integral_limit_rpm == 0 ||
+        (config.ki > 0 && config.integral_limit_rpm > config.maximum_diff_rpm) ||
         !Nonnegative(config.error_filter_tau_s) || config.base_rpm <= 0 ||
         config.turn_rpm > config.base_rpm || config.gap_rpm > config.base_rpm ||
         config.search_rpm > config.base_rpm || config.search_diff_rpm > config.search_rpm ||
@@ -27,8 +29,8 @@ bool Track::Init(const Config &config)
         return false;
     }
     config_ = config;
-    pid_.Init(config.kp, 0, config.kd);
-    pid_.SetLimit(0, config.maximum_diff_rpm, 0.2f);
+    pid_.Init(config.kp, config.ki, config.kd);
+    pid_.SetLimit(config.integral_limit_rpm, config.maximum_diff_rpm, 0.2f);
     initialized_ = true;
     Reset();
     return true;
@@ -135,6 +137,7 @@ void Track::Follow(float error, uint32_t sample_ms)
     command_.base_rpm =
         config_.base_rpm - (config_.base_rpm - config_.turn_rpm) * fabsf(filtered_error_);
     command_.line_error = filtered_error_;
+    command_.timestamp_ms = sample_ms;
     command_.state = State::Following;
     command_.valid = true;
     last_diff_rpm_ = command_.speed_diff_rpm;

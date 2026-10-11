@@ -712,6 +712,11 @@
               <FilePath>../FrameComponets/Bsps/Src/bsp_uart.c</FilePath>
             </File>
             <File>
+              <FileName>bsp_uart1_dma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../FrameComponets/Bsps/Src/bsp_uart1_dma.c</FilePath>
+            </File>
+            <File>
               <FileName>bsp_oled_bus.c</FileName>
               <FileType>1</FileType>
               <FilePath>../FrameComponets/Bsps/Src/bsp_oled_bus.c</FilePath>
@@ -730,6 +735,16 @@
               <FileName>dc_motor.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Mods/Src/dc_motor.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>bluetooth.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/bluetooth.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>nova_protocol.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Mods/Src/nova_protocol.cpp</FilePath>
             </File>
             <File>
               <FileName>gray_sensor.cpp</FileName>
@@ -820,6 +835,16 @@
               <FileName>MainFrame.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Apps/Src/MainFrame.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>NovaLink.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/NovaLink.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>MotorContinuousTest.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>../FrameComponets/Apps/Src/MotorContinuousTest.cpp</FilePath>
             </File>
             <File>
               <FileName>MotorProtection.cpp</FileName>

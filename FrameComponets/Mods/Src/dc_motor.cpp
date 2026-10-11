@@ -56,6 +56,7 @@ bool DcMotor::Init(const Driver &driver, Mode mode)
     command_timeout_ms_ = 250;
     feedback_timeout_ms_ = 50;
     pid_configured_ = false;
+    speed_pid_config_ = {};
     feedback_filter_tau_s_ = filtered_rpm_ = 0;
     filter_valid_ = false;
     speed_pid_.Init(0, 0, 0);
@@ -119,6 +120,8 @@ void DcMotor::Neutral()
     has_command_ = false;
     target_speed_ = target_duty_ = duty_ = 0;
     speed_pid_.Reset();
+    measurement_integral_ = measurement_derivative_ = 0;
+    previous_pv_ = filtered_rpm_;
     if (driver_.stop)
     {
         driver_.stop(driver_.context);
@@ -243,6 +246,7 @@ bool DcMotor::ConfigureSpeedPid(const SpeedPidConfig &config)
         return false;
     }
     speed_pid_.Init(config.kp, config.ki, config.kd);
+    speed_pid_config_ = config;
     speed_pid_.SetLimit(config.integral_limit, 0, config.derivative_filter);
     feedback_filter_tau_s_ = config.feedback_filter_tau_s;
     filter_valid_ = false;
@@ -260,6 +264,11 @@ bool DcMotor::SetTimeouts(uint32_t command_ms, uint32_t feedback_ms)
     command_timeout_ms_ = command_ms;
     feedback_timeout_ms_ = feedback_ms;
     return true;
+}
+
+const DcMotor::SpeedPidConfig &DcMotor::GetSpeedPidConfig() const
+{
+    return speed_pid_config_;
 }
 
 bool DcMotor::UpdateFeedback(uint32_t now)
@@ -341,14 +350,36 @@ float DcMotor::Control()
         pid_tick_ = measure_.timestamp_ms;
         speed_pid_.ManualDt((float)elapsed * 0.001f);
         const float previous_integral = speed_pid_.inte_errors;
-        const float output = speed_pid_.Calc(target_speed_, filtered_rpm_);
+        float output = 0;
+        if (speed_pid_config_.derivative_on_measurement)
+        {
+            const auto &cfg = speed_pid_config_;
+            const float dt = (float)elapsed * 0.001f;
+            const float error = target_speed_ - filtered_rpm_;
+            const float derivative = -(filtered_rpm_ - previous_pv_) / dt;
+            previous_pv_ = filtered_rpm_;
+            measurement_derivative_ +=
+                (1 - cfg.derivative_filter) * (derivative - measurement_derivative_);
+            const float integral =
+                Clamp(measurement_integral_ + cfg.ki * error * dt, cfg.integral_limit);
+            output = cfg.kp * error + integral + cfg.kd * measurement_derivative_;
+            if (fabsf(output) < duty_limit_ || output * error <= 0)
+            {
+                measurement_integral_ = integral;
+            }
+        }
+        else
+        {
+            output = speed_pid_.Calc(target_speed_, filtered_rpm_);
+        }
         if (!isfinite(output))
         {
             Trip(Fault::OutputFailure);
             return 0;
         }
         // 饱和时不再向同一方向累积积分，避免长时间限幅后反向迟滞。
-        if (fabsf(output) >= duty_limit_ && output * speed_pid_.error > 0)
+        if (!speed_pid_config_.derivative_on_measurement && fabsf(output) >= duty_limit_ &&
+            output * speed_pid_.error > 0)
         {
             speed_pid_.inte_errors = previous_integral;
         }

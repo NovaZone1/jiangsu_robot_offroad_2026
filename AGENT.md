@@ -5,6 +5,15 @@
 
 ## 1. 当前工程状态
 
+- 当前临时交付为 **M3 右前轮本地持续 150 RPM 测试固件**，`MotorContinuousTest.hpp` 的
+  `MOTOR_CONTINUOUS_TEST=1`、`SelectedPort=3`。上电等待约 2 秒并停稳后自动启动 M3，M1/M2/M4 禁能。
+  原 MotorProtection 和驱动保护保留；Nova/比赛入口不调度。说明见 [本地单轮测试](docs/motor_continuous_test.md)。
+  本节的临时选择优先于下文原清理版/Nova 行为说明；恢复 Nova 前将本地测试宏设为 0。
+- 已保留 **M1 单轮 Nova 调参固件**，`NovaLink.hpp` 的 `NOVA_M1_TUNING=1`。
+  只允许 M1 试验，M2～M4 持续禁能；不注册/调度比赛应用，不要求未连接的灰度/超声波通过自检。
+  原比赛逻辑和 MotorProtection 保留；恢复比赛需将该开关改为 0 并重新编译、验证。
+  使用 [M1 调参说明](docs/nova_m1_tuning.md) 和提供的 JSON 档案，禁止用通用默认范围试转。
+
 - 主控 STM32F103ZET6，72 MHz，Cortex-M3，无 FPU；Keil ARM Compiler V6，当前本机 V6.14.1。
 - FreeRTOS 使用 `portable/GCC/ARM_CM3`，默认任务通过 osDelayUntil 每 1 ms 推进框架，TIM6 是 HAL 时间基准。
 - V1_main 的 F407 框架已适配 F103，原 Libs 对应本项目 Bsps。
@@ -65,7 +74,7 @@
 | 左后 M2 | PC8/PC9，TIM8 CH3/CH4；PA15/PB3，TIM2 CH1/CH2 | 电机 | 四轮均为 520，减速比 30，11 线四倍频，输出轴 1320 计数/圈 |
 | 右前 M3 | PE9/PE11，TIM1 CH1/CH2；PA0/PA1，TIM5 CH1/CH2 | 电机 | 官方输出极性：左侧反向、右侧不反向；反馈左正右负 |
 | 右后 M4 | PE13/PE14，TIM1 CH3/CH4；PB5/PB4，TIM3 CH2/CH1 | 电机 | 方向表直接针对 TIM 原始计数，已涵盖实际 A/B 布线 |
-| 板载串口 | USART1 PA9 TX / PA10 RX，板载 CH340 | 待正式分配 | 临时电机串口已移除，当前框架不初始化、不占用 USART1；当前改用 DAPLink 下载和调试 |
+| 蓝牙 / Nova | USART1 PA9 TX / PA10 RX；DMA1 CH4 TX / CH5 RX | 共享 | 115200 8N1，bsp_uart1_dma 独占；板载 CH340 共用网络，避免 TX 冲突；使用 DAPLink 下载 |
 | 下载 / 调试 | PA13 SWDIO / PA14 SWCLK，SWD | 共享 | 当前 DAPLink，Keil 选择 CMSIS-DAP Debugger；保留 SWD 引脚，不得复用 |
 | 原厂超声波 | PF11 TRIG、PF12 ECHO / EXTI12，TIM7 | 超声波 | 原厂接口，20 us 触发、60 ms 间隔、35 ms 超时；DWT 采集回波 |
 | 灰度阵列 | x1～x8：PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1 | 灰度 | 用户确认接线；8-LP 数字输入，OLED 按 x1～x8 显示；车体左右方向待安装确认 |
@@ -190,16 +199,25 @@ GrayArray.Bind(&gray_context, ReadGray);
 - 现有基础周期为 1 ms：更新 DWT、传感器采样，随后按分频更新系统，最后执行控制。
   应用、系统、状态机和动作的周期为 5 ms；状态机/动作仅在 WORKING 时运行。
   最后调用 `DcMotor::ControlAllMotors()`，禁能状态也采集编码器。
-  当前默认任务仍调用 FrameTickCpp，但电机试车开关开启时仅更新 DWT 和 Motor520Bench。
-  关闭试车开关才执行上述原比赛流程；试车不能与循迹同时提交电机目标。
+  临时试车入口已清理；NovaLink 在每周期保护检查前处理有界通信，故障时仍可接收停车命令。
+  蓝牙连接不自动启动电机；M1 模式仅在完成限幅配置、停稳并显式 set_target 后启动。
+  参数仅在禁能时更新（可以正在滑行），重新使能仍须停稳；原保护和故障锁定不能绕过。
   循环使用 osDelayUntil，上述周期是设计目标，不能当作实测保证。
 - Reader 和控制回调应及时返回，不得在这条共享循环中等待硬件、执行阻塞日志或使用 `Seq::Wait/WaitUntil`。
 - 当前框架注册及应用操作由同一任务执行，不得从 ISR 修改注册表、调用 Monitor 或触发整套系统更新。
 - ISR 和任务之间的多字段数据交接要使用短临界区、双缓冲等明确同步方案；仅加 `volatile` 不能保证整帧一致。
 - GPIO/UART 的 HAL 回调已经在 BSP 中定义，先检查现有分发入口再增加模块回调。
   不得在各模块重复定义同名 `HAL_GPIO_EXTI_Callback`、`HAL_UART_RxCpltCallback` 或 RX Event 回调。
-- UART DMA 当前支持普通接收模式；循环 DMA 需另做增量索引适配。
-  BSP 回调返回后会继续接收，模块须及时复制所需数据，不能长期持有将被覆盖的缓冲区。
+- 原 bsp_uart 仍提供普通 DMA；USART1 由独立 bsp_uart1_dma 实现循环 DMA 增量处理，不能重复注册。
+  USART1 / DMA1 CH4/5 的 IRQ 在该 BSP 中唯一实现，不占用已有 HAL UART 回调。
+  Bluetooth 负责透传，NovaProtocol 负责协议，NovaLink 负责四轮/循迹参数绑定；详见 [蓝牙与 Nova](docs/bluetooth_nova.md)。
+  M1 调参模式已绑定 configure/heartbeat/set_target，只有通道 1 宣告完整自动能力。
+  M1 使用 DcMotor 可选 D-on-measurement；其他电机和比赛模式仍使用原 D-on-error，不得混淆参数。
+  心跳 0.8～2 秒、单轮 45 秒硬上限、目标绝对上限 150 RPM、PWM 硬上限 0.69；异常锁定至复位。
+  STOP 立即禁能，后续启动仍等待原停稳互锁；配置与参数下发不会自行启动。
+  蓝牙实物已确认是 DX-BT24 BLE 5.1，FFE0 服务、FFE1 通知、FFE2 写入；电脑使用
+  `tools/ble_bridge` 桥接，桥接占 COM11、Nova 占 COM12，COM5 属于 DAPLink。
+  桥接及固件只读查询已实测双向成功；桥接不自动重连/重放命令，不代替设备端停车保护。
 
 模块 `IsReady()` 当前主要检查回调是否绑定，不代表线路正常或测量有效。
 整车自检还要求灰度和超声波有新鲜有效样本；运行中数据过期会触发系统停止。

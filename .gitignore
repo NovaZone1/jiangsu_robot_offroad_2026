@@ -29,6 +29,8 @@
 # 主机测试输出。
 /tests/frame/out/
 __pycache__/
+.venv/
+/tools/ble_bridge/runtime/
 
 # 编辑器临时文件及系统元数据。
 *.bak

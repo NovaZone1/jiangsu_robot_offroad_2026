@@ -27,6 +27,8 @@ public:
     void StopMotors();
     const Track::Command &GetTrackCommand() const;
     SpeedMixer &GetSpeedMixer(); // Future APP policies share this single motor writer.
+    const Track::Config &GetTrackConfig() const;
+    bool ConfigureTrackPid(float kp, float ki, float kd); // Stopped and all motors disabled only.
 
 protected:
     void Start() override;

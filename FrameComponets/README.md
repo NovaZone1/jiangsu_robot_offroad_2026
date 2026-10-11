@@ -1,10 +1,17 @@
 # STM32F103ZE 越野比赛框架
 
+> 当前临时选择 M3 本地持续 150 RPM 测试：复位后约 2 秒自动启动右前轮，其他轮禁能。
+> `MOTOR_CONTINUOUS_TEST=1` 优先于 Nova，保留原保护，详见 [测试说明](../docs/motor_continuous_test.md)。
+> 下文的原清理版/上电禁能说明适用于关闭本地测试宏后；本地模式不启动蓝牙通信。
+> 本地测试宏设为 0 后，恢复 M1 单轮 Nova AI 调参模式，M2～M4 禁能，比赛应用暂不运行。
+> 开关 `NOVA_M1_TUNING` 与恢复比赛的方法见 [M1 调参说明](../docs/nova_m1_tuning.md)。
+
 > 临时电机、灰度、超声波测试入口已从固件清理，驱动与保护保留；主机夹具仅用于回归。
 > 当前电机为 520、30:1、11 线，输出轴 1320 计数/圈，四路单轮测试及灰度测试已获用户确认。
 > 原循迹框架恢复，上电禁能；启动仍需要校准、自检和显式请求。初始 PI 尚未正式调参。
 > 方向、无转速、超速、超时和停车等待由正式 [MotorProtection](../docs/motor_protection.md) 保留。
 > 原厂超声波绑定和 OLED/灰度驱动保留，比赛策略联合验证尚未完成。
+> USART1 已接入 115200 蓝牙 DMA 与 Nova 参数/曲线接口，使用步骤及自动调参边界见 [蓝牙与 Nova](../docs/bluetooth_nova.md)。
 
 移植参考为 [ZWJ_GeneralFramework 的 V1_main 分支](https://github.com/zwj051029/ZWJ_GeneralFramework/tree/V1_main)，
 固定提交 `e403922005831e20a1f764486dffbcb64c216bb5`。
@@ -22,6 +29,7 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Bsps | bsp_tim_pwm | V1_main 的 Libs；区分 APB1/APB2、分频为 1 时不倍频，修复空指针及启停状态 |
 | Bsps | bsp_dwt | V1_main 计时接口；改为当前 HCLK，原子累加计数差，修复溢出轮次乘 UINT32_MAX 的误差 |
 | Bsps | bsp_uart | V1_main 注册及收发接口；去掉硬编码的灰度串口协议，注册不阻塞，检查缓存长度，提供 IT/普通 DMA 接收 |
+| Bsps / Mods / Apps | bsp_uart1_dma、bluetooth、nova_protocol、NovaLink | USART1 DMA 透传、Nova v2 / 普通 PID、四轮和循迹参数读写；不自动接管运动 |
 | Bsps | bsp_adc、bsp_encoder | 新增底层支持，供模拟灰度及电机编码器模块使用；ADC 使用 F1 校准接口，编码器按 16 位定时器处理回绕 |
 | Algorithm | std_math、pid | V1_main 数学、向量和 PID；使用软件浮点，补齐 PID 初始状态和零时间间隔保护 |
 | Algorithm | signator、linear_math | 完整移植 TD、滤波、摩擦补偿、方波、Kalman、IV 辨识和矩阵工具；修复矩阵求逆改写输入、Kalman 忽略控制输入、IV 状态未初始化 |
@@ -96,7 +104,7 @@ TIM6 专用于 HAL 时间基准，不能分配给电机、编码器或超声波�
 TIM1/8、TIM2/3/4/5 保留给四路电机；此次 `.ioc` 未修改，不得重复生成/运行另一套电机初始化。
 PWM ARR 建议不大于 65534，以便 CCR=ARR+1 表示完全导通；ARR=65535 时最大 CCR 为 65535。
 ADC BSP 当前提供单通道单次读取，不等同于多通道扫描 DMA 驱动。
-UART RX DMA 当前要求普通模式，循环 DMA 需另外实现增量索引处理。
+通用 bsp_uart 的 RX DMA 要求普通模式；USART1 的循环 DMA 增量接收由独立 bsp_uart1_dma 管理。
 日志 sink 应有界、非阻塞；未绑定时日志关闭。ISR 禁止调用 Monitor 或修改框架注册表。
 
 DWT 至少每约 59 秒（72 MHz 下）采样一次以保留溢出信息，框架每毫秒维护。

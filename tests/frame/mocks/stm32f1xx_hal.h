@@ -2,6 +2,17 @@
 #include <stdint.h>
 #include <stddef.h>
 
+struct GPIO_TypeDef
+{
+    uint32_t IDR, ODR;
+};
+
+enum GPIO_PinState
+{
+    GPIO_PIN_RESET,
+    GPIO_PIN_SET
+};
+
 struct TestDwt
 {
     uint32_t CYCCNT, CTRL;
