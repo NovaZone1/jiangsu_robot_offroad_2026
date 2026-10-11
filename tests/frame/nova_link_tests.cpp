@@ -1,3 +1,4 @@
+#include "fixtures/SyntheticMotorPid.hpp"
 #include "NovaLink.hpp"
 #include "MainFrame.hpp"
 #include "LineFollowBoard.hpp"
@@ -106,15 +107,17 @@ int main()
         *value = rpm;
         return true;
     };
-    const float expected_kp[] = {.000957f, .001329f, .001176f, .001442f};
-    const float expected_ki[] = {.009191f, .010857f, .013926f, .010392f};
     for (uint8_t i = 0; i < 4; ++i)
     {
         assert(motors[i]->Init(driver));
+        assert(MotorSpeedProfiles::Apply(*motors[i], i + 1U, true));
+        const auto reverse = motors[i]->GetSpeedPidConfig();
+        assert(reverse.kp == 0 && reverse.ki == 0 && reverse.kd == 0);
         assert(MotorSpeedProfiles::Apply(*motors[i], i + 1U, false));
         const auto pid = motors[i]->GetSpeedPidConfig();
-        assert(pid.kp == expected_kp[i] && pid.ki == expected_ki[i] && pid.kd == 0);
+        assert(pid.kp == 0 && pid.ki == 0 && pid.kd == 0);
         assert(pid.integral_limit == .69f && !motors[i]->IsEnabled());
+        assert(!motors[i]->Enable()); // All-zero gains are not valid speed control configuration.
     }
     assert(MotorSafety.Init());
     assert(LineFollow.Init(LineFollowApp::Config()));
@@ -141,7 +144,7 @@ int main()
     }
     assert(Command("LOOP:2") == "OK:LOOP:2\r\n");
     assert(Command("PID:0.002,0.01,0.0001") == "OK:PID\r\n");
-    assert(Motor2.GetSpeedPidConfig().kp == .002f && Motor1.GetSpeedPidConfig().kp == .000957f);
+    assert(Motor2.GetSpeedPidConfig().kp == .002f && Motor1.GetSpeedPidConfig().kp == 0);
     assert(Motor2.GetSpeedPidConfig().feedback_filter_tau_s == .03f);
     assert(Command("PID:Kp=1").find("gain_limit") != std::string::npos);
     assert(Motor2.Enable());
@@ -178,6 +181,7 @@ int main()
     System.Stop(true);
     response = Command("@{\"type\":\"command\",\"id\":\"t-4\",\"cmd\":\"stop\",\"channel\":5}");
     assert(System.GetState() == Systems::ERROR);
+    assert(ConfigureSyntheticMotorPid(Motor1));
     assert(Motor1.Enable());
     rpm = 500;
     ++test_tick;

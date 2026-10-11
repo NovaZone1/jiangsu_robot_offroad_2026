@@ -59,6 +59,11 @@ namespace
                 assert(motors[i].Init({&feedback[i], Write, Stop, Read}));
                 assert(MotorSpeedProfiles::Apply(motors[i], i + 1, false));
             }
+            // Synthetic host model gains only; main firmware defaults remain all zero.
+            auto pid = motors[MotorContinuousTest::SelectedIndex].GetSpeedPidConfig();
+            pid.kp = .002f;
+            pid.ki = .012f;
+            assert(motors[MotorContinuousTest::SelectedIndex].ConfigureSpeedPid(pid));
             assert(guard.Init());
             assert(bench.Init());
         }

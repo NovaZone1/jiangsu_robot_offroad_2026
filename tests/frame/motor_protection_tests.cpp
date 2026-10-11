@@ -1,3 +1,4 @@
+#include "fixtures/SyntheticMotorPid.hpp"
 #include "MotorProtection.hpp"
 #include "MotorSpeedProfiles.hpp"
 #include "stm32f1xx_hal.h"
@@ -58,6 +59,7 @@ namespace
             {
                 assert(motors[i].Init({&feedback[i], Write, Stop, Read}));
                 assert(MotorSpeedProfiles::Apply(motors[i], i + 1U, false));
+                assert(ConfigureSyntheticMotorPid(motors[i]));
                 feedback[i].fresh = true;
                 motors[i].Control();
             }

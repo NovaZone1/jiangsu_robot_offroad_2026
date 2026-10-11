@@ -1,3 +1,4 @@
+#include "fixtures/SyntheticMotorPid.hpp"
 #include "motor_pwm_driver.hpp"
 #include "MotorSpeedProfiles.hpp"
 #include <assert.h>
@@ -311,6 +312,10 @@ void RunMotorTests()
     test_tick = 2000;
     feedback.rpm = 0;
     feedback.fresh = true;
+    motor.Control();
+    assert(!motor.Enable()); // Zero default gains must retain the original unconfigured guard.
+    assert(ConfigureSyntheticMotorPid(motor));
+    feedback.fresh = true; // Re-prime the feedback filter reset by ConfigureSpeedPid.
     motor.Control();
     assert(motor.Enable() && motor.SetSpeed(60));
     assert(!MotorSpeedProfiles::Apply(motor, 2, true));

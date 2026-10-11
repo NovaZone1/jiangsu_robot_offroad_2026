@@ -1,7 +1,7 @@
 # PWM 减速电机开发说明
 
 > 当前适配 520、30:1 电机，用户已确认四路单轮测试正常。临时入口已清理，正式保护保留，上电禁能等待应用启动。
-> 已调正转 PI 位于 `Apps/Inc/MotorSpeedProfiles.hpp`；旧 [310 实测记录](../../docs/motor_pid_20261001/README.md) 仅作历史资料。
+> 主分支 `Apps/Inc/MotorSpeedProfiles.hpp` 的四轮正反转 PID 全零；个人记录仅在车辆分支保存。
 
 当前适配 YB-DSF01 的 STM32F103ZET6、AT8236 双输入驱动和 520 编码减速电机。
 只参考 [Reactor70 的 MotorDJI 接口](https://github.com/njustup70/Reactor70/blob/master/Mods/inc/motor_dji.hpp)
@@ -22,7 +22,7 @@
 | `Bsps/Inc/bsp_motor_board.h`、`Bsps/Src/bsp_motor_board.c` | 本板 GPIO、AFIO、20 kHz PWM 和四路编码器定时器初始化 |
 | `Bsps/Src/bsp_tim_pwm.c`、`Bsps/Src/bsp_encoder.c` | 检查 HAL 返回值、双通道更新、计数回绕 |
 | `Apps/Src/MainFrame.cpp` | 四轮与 M1..M4 实际端口绑定，集中配置输出/编码器方向 |
-| `Apps/Inc/MotorSpeedProfiles.hpp` | 520 编码器参数、已调正转 PI / 未调反转初值、滤波和限幅，配置时保持禁能 |
+| `Apps/Inc/MotorSpeedProfiles.hpp` | 520 编码器参数、全零正反转 PI、滤波和限幅，配置时保持禁能 |
 | `Apps/Inc/MotorProtection.hpp`、`Apps/Src/MotorProtection.cpp` | 四轮方向、无转速、超速、故障锁定和停稳等待；不产生运动指令 |
 | `Sys/Src/RtosCpp.cpp` | 每 1 ms 调用框架采样、状态机和电机控制 |
 
@@ -127,16 +127,16 @@ CubeMX 重新生成后保留框架初始化调用；不要再对这些资源运�
 ## 520 四轮速度 PI 配置
 
 `Apps/Inc/MotorSpeedProfiles.hpp` 按 M1～M4 保存前进、后退参数。
-四轮正转已分别完成 100 RPM 单轮台架调参，见 [参数与实测记录](../../docs/motor_pid_20261011.md)。
-反转仍为 **Kp=0.0012、Ki=0.008、Kd=0**，尚未调参。
+主分支四轮正反转 **Kp=Ki=Kd=0**，没有可供实车行驶的默认增益。
+个人参数和记录保存在车辆分支，见 [分支约定](../../ROBOT_VARIANT.md)。
 本板初始化四轮驱动后，分别调用 `MotorSpeedProfiles::Apply(motor, port, false)` 配置前进参数，
-保持禁能；随后由选中的比赛应用决定何时使能。旧 310 实测参数不再用于新电机。
+保持禁能；随后由选中的比赛应用决定何时使能。主分支不包含旧电机的实测参数。
 
 - PI 输入为输出轴 RPM，积分时间单位为秒，输出为实际 PWM 占空比；Kd=0。
 - 输出限幅和积分限幅均为 0.69，反馈低通时间常数 0.03 秒。
 - `GetMeasure().speed_rpm` 保留原始测速；`GetFilteredRpm()` 返回闭环使用的滤波值。
 - 通用库的 `feedback_filter_tau_s=0` 表示不滤波，本板参数显式设置为 0.03 秒。
-- 当前目标限幅为 180 RPM，本轮实测目标为 100 RPM。软件限制不是实际可达转速保证。
+- 当前目标限幅为 180 RPM，实际目标由车辆分支验证。软件限制不是实际可达转速保证。
 - `Apply` 只接受就绪、禁能的电机和端口 1～4，清除旧目标和积分，配置后不自动使能。
 
 上层需要后退参数时，先提交停车并等车轮停稳，再禁能并切换。配置示例：
@@ -164,9 +164,9 @@ DcMotor 原命令/反馈超时、非法输入、输出失败、限幅及 PID 保
 当前恢复原 LineFollowBoard 选择的应用，不再编译自动试车或传感器诊断。
 MainFrame 绑定四轮 MotorSafety 和原厂超声波；循迹入口保留原灰度预热、操作者校准、自检和显式启动。
 四轮初始化后禁能，保护模块不使能电机；循迹原 OLED 轮速显示保留。
-使用 DAPLink / CMSIS-DAP 下载工程的正常 AXF，新独立 HEX 为 `MDK-ARM/four_wheel_pid_clean.hex`。
+使用 DAPLink / CMSIS-DAP 下载工程的正常 AXF，新独立 HEX 为 `MDK-ARM/main_zero_pid.hex`。
 历史试车 HEX 不属于当前清理版；源码变化只有下载新固件后才会影响开发板。
 
 主机回归覆盖 AT8236、1320 CPR、PID/滤波、资源冲突、HAL 故障、超时及正式四轮保护。
 试车时序只保留在 tests/frame/fixtures，不参与 Keil 编译。全部回归和 V6 Rebuild 通过，0 Error / 0 Warning。
-清理构建日志：`MDK-ARM/build-four-wheel-pid-clean.log`。整车负载与反转仍需后续实测。
+清理构建日志：`MDK-ARM/build-main-zero-pid.log`。整车负载与反转仍需后续实测。

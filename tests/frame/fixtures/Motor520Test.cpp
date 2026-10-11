@@ -1,3 +1,4 @@
+#include "SyntheticMotorPid.hpp"
 #include "Motor520Test.hpp"
 // Host-only timing regression fixture. Production protection is MotorProtection.
 #include "MotorSpeedProfiles.hpp"
@@ -87,7 +88,8 @@ bool Motor520Test::Begin(Phase phase, uint32_t now, bool apply_profile)
             {
                 continue;
             }
-            if (!MotorSpeedProfiles::Apply(*motors_[i], i + 1U, backward) || !motors_[i]->Enable())
+            if (!MotorSpeedProfiles::Apply(*motors_[i], i + 1U, backward) ||
+                !ConfigureSyntheticMotorPid(*motors_[i]) || !motors_[i]->Enable())
             {
                 Fail(Failure::MotorNotReady, i + 1U);
                 return false;

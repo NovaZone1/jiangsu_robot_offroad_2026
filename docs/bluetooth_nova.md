@@ -1,6 +1,6 @@
 # USART1 蓝牙与 Nova 接入
 
-> 当前为四轮 PID 清理版，上电禁能，Nova AI 试转默认关闭。参数与验证见 [四轮记录](motor_pid_20261011.md)。
+> 主分支电机 PID 全零，不保存个人调参记录；上电禁能，Nova AI 试转默认关闭。
 
 > 更新：用户实际模块已确认是 DX-BT24 BLE 5.1，已扫描并完成 BLE 双向参数查询。
 > 本机通过 [BLE 桥接程序](../tools/ble_bridge/README.md) 接入；桥接用 COM11，Nova 选择 COM12。
@@ -16,7 +16,7 @@
 仍可查看 CH1～CH4 转速、查询参数、停车；参数写入要求电机已禁能。连接和参数写入不启动电机。
 如以后需要重新单轮调参，须显式设置 `NOVA_MOTOR_TUNING=1` 和 `NOVA_TUNING_PORT=1..4`，
 重新编译并核对所选轮、档案、限幅与已保存增益；原保护及其他三轮禁能约束仍生效。
-历史操作说明保留供参考，自动持续试转类仅作为电脑回归夹具，不再提供生产固件启动开关。
+个人档案和历史操作说明仅在车辆分支保留。自动持续试转类仅作电脑回归夹具，不参与固件编译。
 
 参考的是 Nova `main` 提交
 [`a0de0488e37597d41cea9bde2aa15752a418261c`](https://github.com/zwj051029/Nova/tree/a0de0488e37597d41cea9bde2aa15752a418261c)，
@@ -95,9 +95,9 @@ ID 应在会话内保持唯一；这个有界重发缓存不是跨重启、跨�
 ```text
 LOOP:1
 PID?
-PID:0.001200,0.008000,0.000000
-PID:Kp=0.001200
-PID:Ki=0.008000
+PID:0.000000,0.000000,0.000000
+PID:Kp=0
+PID:Ki=0
 PID:Kd=0.000000
 ```
 
@@ -106,7 +106,7 @@ v2 可在串口页直接发送，每个新请求使用不同 ID：
 ```text
 @{"type":"command","id":"manual-1","cmd":"hello","channel":1}
 @{"type":"command","id":"manual-2","cmd":"get","channel":1}
-@{"type":"command","id":"manual-3","cmd":"set_pid","channel":1,"gains":[0.0012,0.008,0]}
+@{"type":"command","id":"manual-3","cmd":"set_pid","channel":1,"gains":[0,0,0]}
 @{"type":"command","id":"manual-4","cmd":"stop","channel":1}
 ```
 

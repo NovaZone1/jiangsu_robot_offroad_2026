@@ -1,3 +1,4 @@
+#include "fixtures/SyntheticMotorPid.hpp"
 #include "LineFollowApp.hpp"
 #include "MotorSpeedProfiles.hpp"
 #include "bsp_oled_bus.h"
@@ -220,6 +221,7 @@ namespace
             DcMotor::Driver driver = {&wheels[index], SetDuty, Stop, ReadRpm};
             assert(motors[index].Init(driver));
             assert(MotorSpeedProfiles::Apply(motors[index], index + 1U, false));
+            assert(ConfigureSyntheticMotorPid(motors[index]));
         }
         gray.Bind(nullptr, ReadGray);
         LineFollowApp app(gray, motors[0], motors[1], motors[2], motors[3]);

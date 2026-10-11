@@ -2,8 +2,8 @@
 
 #include "dc_motor.hpp"
 
-// YB-DSF01 / 520、30:1；四轮正转参数来自 2026-10-11 Nova 100 RPM 台架复测。
-// 旧 310 电机实测参数仅保留在 docs/motor_pid_20261001，不适用于本电机。
+// Shared board defaults: no personal motor tuning data.
+// All forward/reverse gains are zero; configure and validate on the owning robot branch.
 namespace MotorSpeedProfiles
 {
     struct Gains
@@ -19,13 +19,9 @@ namespace MotorSpeedProfiles
     constexpr float feedback_tau_s = 0.03f;
     constexpr float integral_limit = duty_limit;
     // 输入 RPM，时间秒，输出归一化 PWM，Kd=0。
-    // 四轮正转使用各自复测参数；反转仍保留未调参初值。
-    const Gains forward[4] = {{0.000957f, 0.009191f},
-                              {0.001329f, 0.010857f},
-                              {0.001176f, 0.013926f},
-                              {0.001442f, 0.010392f}};
-    const Gains reverse[4] = {
-        {0.0012f, 0.008f}, {0.0012f, 0.008f}, {0.0012f, 0.008f}, {0.0012f, 0.008f}};
+    // 主分支四轮正反转均未配置，Kp/Ki/Kd 为零。
+    const Gains forward[4] = {};
+    const Gains reverse[4] = {};
 
     // 只能在禁能后配置。调用会清积分和目标，成功后仍需显式 Enable。
     inline bool Apply(DcMotor &motor, uint8_t port, bool backward)
@@ -38,6 +34,7 @@ namespace MotorSpeedProfiles
         DcMotor::SpeedPidConfig pid;
         pid.kp = gains.kp;
         pid.ki = gains.ki;
+        pid.kd = 0;
         pid.integral_limit = integral_limit;
         pid.feedback_filter_tau_s = feedback_tau_s;
         return motor.SwitchMode(DcMotor::Mode::Speed) && motor.ConfigureSpeedPid(pid) &&

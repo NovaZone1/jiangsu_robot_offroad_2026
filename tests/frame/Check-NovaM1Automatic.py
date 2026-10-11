@@ -1,7 +1,6 @@
 """Run the unmodified Nova automatic tuner against the real C++ single-motor controller, no hardware."""
 import argparse
 import collections
-import json
 from pathlib import Path
 import subprocess
 import sys
@@ -16,14 +15,29 @@ from tuning.models import PIDGains
 from tuning.storage import config_from_dict
 
 root = Path(__file__).resolve().parents[2]
-profile_name = {
-    1: "nova_m1_520_tuned_100rpm_69pct_profile.json",
-    2: "nova_m2_520_100rpm_69pct_profile.json",
-    3: "nova_m3_520_tuned_100rpm_69pct_profile.json",
-    4: "nova_m4_520_100rpm_69pct_profile.json",
-}[args.port]
-profile = json.loads((root / "docs" / profile_name).read_text(encoding="utf-8"))
-config = config_from_dict(profile["config"])
+# Synthetic host-only configuration. No customer profile or recorded tuning data is loaded.
+profile = {"gains": {"kp": .002, "ki": .012, "kd": 0}}
+config = config_from_dict({
+    "gain_min": {"kp": .0002, "ki": .001, "kd": 0},
+    "gain_max": {"kp": .01, "ki": .05, "kd": 0},
+    "safety": {
+        "actual_min": -120, "actual_max": 150, "output_abs_max": .69,
+        "max_overshoot_percent": 40, "max_relative_gain_change": .2,
+        "max_absolute_gain_change": {"kp": .0002, "ki": .001, "kd": 0},
+        "telemetry_timeout": 1, "saturation_seconds": 1,
+    },
+    "capture_seconds": 5, "sample_period_seconds": .01, "max_trials": 8,
+    "settling_tolerance_percent": 2, "minimum_step": 10, "minimum_samples": 50,
+    "weight_iae": .4, "weight_overshoot": .25, "weight_settling": .2,
+    "weight_steady_error": .1, "weight_output_variation": .05,
+    "settling_hold_seconds": .5, "channel": args.port, "mode": "PI",
+    "locked": [False, False, True],
+    "gain_resolution": {"kp": .000001, "ki": .000001, "kd": .000001},
+    "initial_target": 0, "step_target": 100, "stable_tolerance": 3,
+    "stable_seconds": 1.2, "stability_timeout": 8, "pre_seconds": 1,
+    "patience": 3, "target_score": 0, "device_name": "Synthetic host plant",
+    "unit": "RPM", "algorithm": "positional_pid_d_on_measurement",
+})
 pending = collections.deque()
 clock = [0.02]
 states = []

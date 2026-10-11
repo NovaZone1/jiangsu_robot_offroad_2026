@@ -50,23 +50,13 @@ static void CheckInactiveMotors()
             assert(!motors[i]->IsEnabled());
         }
     }
-    if (TestChannel() != 1)
+    for (unsigned i = 0; i < 4; ++i)
     {
-        assert(Motor1.GetSpeedPidConfig().kp == 0.000957f);
-        assert(Motor1.GetSpeedPidConfig().ki == 0.009191f);
-        assert(Motor1.GetSpeedPidConfig().kd == 0);
-    }
-    if (TestChannel() != 2)
-    {
-        assert(Motor2.GetSpeedPidConfig().kp == 0.001329f);
-        assert(Motor2.GetSpeedPidConfig().ki == 0.010857f);
-        assert(Motor2.GetSpeedPidConfig().kd == 0);
-    }
-    if (TestChannel() != 3)
-    {
-        assert(Motor3.GetSpeedPidConfig().kp == 0.001176f);
-        assert(Motor3.GetSpeedPidConfig().ki == 0.013926f);
-        assert(Motor3.GetSpeedPidConfig().kd == 0);
+        if (i != static_cast<unsigned>(TestChannel() - 1))
+        {
+            const auto pid = motors[i]->GetSpeedPidConfig();
+            assert(pid.kp == 0 && pid.ki == 0 && pid.kd == 0);
+        }
     }
 }
 
@@ -271,25 +261,24 @@ int main(int argc, char **argv)
         assert(motors[i]->Init(driver));
         assert(MotorSpeedProfiles::Apply(*motors[i], i + 1, false));
     }
+    for (auto motor : motors)
+    {
+        const auto pid = motor->GetSpeedPidConfig();
+        assert(!motor->IsEnabled() && pid.kp == 0 && pid.ki == 0 && pid.kd == 0);
+    }
     auto config = TestMotor().GetSpeedPidConfig();
     config.derivative_on_measurement = true;
-    assert(TestMotor().ConfigureSpeedPid(config));
-    const float expected_kps[] = {0.000957f, 0.001329f, 0.001176f, 0.001442f};
-    const float expected_kis[] = {0.009191f, 0.010857f, 0.013926f, 0.010392f};
-    const char *expected_pid_replies[] = {
-        "PID:0.000957,0.009191,0.000000", "PID:0.001329,0.010857,0.000000",
-        "PID:0.001176,0.013926,0.000000", "PID:0.001442,0.010392,0.000000"};
-    const float expected_kp = expected_kps[TestChannel() - 1];
-    assert(TestMotor().GetSpeedPidConfig().kp == expected_kp);
-    assert(TestMotor().GetSpeedPidConfig().ki == expected_kis[TestChannel() - 1]);
-    assert(TestMotor().GetSpeedPidConfig().kd == 0.0f);
-    assert(TestMotor().GetSpeedPidConfig().integral_limit == 0.69f);
-    for (unsigned i = 0; i < 4; ++i)
+    // Synthetic host plant gains, not measured hardware parameters; never compiled into firmware.
+    if (monitor_mode)
     {
-        assert(!motors[i]->IsEnabled());
-        assert(motors[i]->GetSpeedPidConfig().kp == expected_kps[i]);
-        assert(motors[i]->GetSpeedPidConfig().ki == expected_kis[i]);
+        config.kp = .002f;
+        config.ki = .012f;
     }
+    assert(TestMotor().ConfigureSpeedPid(config));
+    const float expected_kp = config.kp;
+    const char *expected_pid_reply =
+        monitor_mode ? "PID:0.002000,0.012000,0.000000" : "PID:0.000000,0.000000,0.000000";
+    assert(TestMotor().GetSpeedPidConfig().integral_limit == .69f);
     assert(MotorSafety.Init());
     if (monitor_mode)
     {
@@ -329,7 +318,7 @@ int main(int argc, char **argv)
             replies += frame;
         }
         assert(replies.find("OK:LOOP:" + std::to_string(TestChannel())) != std::string::npos);
-        assert(replies.find(expected_pid_replies[TestChannel() - 1]) != std::string::npos);
+        assert(replies.find(expected_pid_reply) != std::string::npos);
         assert(replies.find("ERR:monitor_only") != std::string::npos);
         assert(TestMotor().GetSpeedPidConfig().kp == expected_kp);
         assert(TestMotor().GetSpeedPidConfig().integral_limit == 0.69f);
@@ -471,7 +460,7 @@ int main(int argc, char **argv)
     assert(!Ok(Command("set_target", ",\"value\":60", other_channel)));
     assert(!Ok(Command("set_pid", ",\"gains\":[0.002,0.01,0]", other_channel)));
     assert(Ok(Command("stop")));
-    assert(Ok(Command("set_pid", ",\"gains\":[0.0012,0.008,0]")));
+    assert(Ok(Command("set_pid", ",\"gains\":[0.002,0.012,0]")));
     assert(Ok(Command("set_target", ",\"value\":0")));
     assert(!TestMotor().IsEnabled());
     assert(Command("set_target", ",\"value\":60").find("waiting_for_standstill") !=
@@ -488,7 +477,8 @@ int main(int argc, char **argv)
     rpm = 60;
     if (scenario == "other_enabled")
     {
-        assert(motors[TestChannel() == 1 ? 2 : 0]->Enable());
+        auto &other = *motors[TestChannel() == 1 ? 2 : 0];
+        assert(other.SwitchMode(DcMotor::Mode::Duty) && other.Enable());
         Tick();
     }
     else if (scenario == "watchdog")
