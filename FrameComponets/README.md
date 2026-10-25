@@ -7,7 +7,6 @@
 
 > 临时电机、灰度、超声波测试入口已从固件清理，驱动与保护保留；主机夹具仅用于回归。
 > 当前电机为 520、30:1、11 线，输出轴 1320 计数/圈，四路单轮测试及灰度测试已获用户确认。
-> 原循迹框架恢复，上电禁能；启动仍需要校准、自检和显式请求。主分支不是已调参车辆固件。
 > 方向、无转速、超速、超时和停车等待由正式 [MotorProtection](../docs/motor_protection.md) 保留。
 > 原厂超声波绑定和 OLED/灰度驱动保留，比赛策略联合验证尚未完成。
 > USART1 已接入 115200 蓝牙 DMA 与 Nova 参数/曲线接口，使用步骤及自动调参边界见 [蓝牙与 Nova](../docs/bluetooth_nova.md)。
@@ -28,7 +27,7 @@ Flash 512 KiB，RAM 64 KiB。工程仍使用 ARM Compiler V6。
 | Bsps | bsp_tim_pwm | V1_main 的 Libs；区分 APB1/APB2、分频为 1 时不倍频，修复空指针及启停状态 |
 | Bsps | bsp_dwt | V1_main 计时接口；改为当前 HCLK，原子累加计数差，修复溢出轮次乘 UINT32_MAX 的误差 |
 | Bsps | bsp_uart | V1_main 注册及收发接口；去掉硬编码的灰度串口协议，注册不阻塞，检查缓存长度，提供 IT/普通 DMA 接收 |
-| Bsps / Mods / Apps | bsp_uart1_dma、bluetooth、nova_protocol、NovaLink | USART1 DMA 透传、Nova v2 / 普通 PID、四轮和循迹参数读写；不自动接管运动 |
+| Bsps / Mods / Apps | bsp_uart1_dma、bluetooth、nova_protocol、NovaLink | USART1 DMA 透传、Nova v2 / 普通 PID、四轮参数读写；不自动接管运动 |
 | Bsps | bsp_adc、bsp_encoder | 新增底层支持，供模拟灰度及电机编码器模块使用；ADC 使用 F1 校准接口，编码器按 16 位定时器处理回绕 |
 | Algorithm | std_math、pid | V1_main 数学、向量和 PID；使用软件浮点，补齐 PID 初始状态和零时间间隔保护 |
 | Algorithm | signator、linear_math | 完整移植 TD、滤波、摩擦补偿、方波、Kalman、IV 辨识和矩阵工具；修复矩阵求逆改写输入、Kalman 忽略控制输入、IV 状态未初始化 |
@@ -56,10 +55,9 @@ WS2812、远程控制/消息编码及空 Chassis 文件。
   需要按型号补充触发/回波捕获或串口协议、测量超时、触发间隔和距离换算。
 - `Mods/Inc/gray_sensor.hpp`、`Mods/Src/gray_sensor.cpp`：预留最多 16 路采样及标定结果。
   需要按型号补充 GPIO/ADC/串口读取、白线与背景标定、通道位置。
-  `GetLineError()` 只计算已标定数据的加权偏差，不代替实际采集驱动。
 
 电机、原厂超声波和八路灰度驱动保留。MainFrame 绑定四轮、MotorSafety、原厂超声波，
-并按 LineFollowBoard 选择初始化灰度和循迹应用。四轮初始化后禁能，等待原校准、自检与启动条件。
+四轮初始化后禁能，等待原校准、自检与启动条件。
 默认任务每 1 ms 采样/控制，MotorSafety 在输出前检查调度、测速后检查反馈和运动异常。
 临时自动试车和灰度/超声波诊断已移至 tests/frame/fixtures；固件不编译这些类，也没有测试宏。
 M4 的 520 编码器方向已按实测修正，其余方向沿用已确认配置；PWM 不叠加旧固定死区补偿。
@@ -75,10 +73,7 @@ M4 的 520 编码器方向已按实测修正，其余方向沿用已确认配置
 以下策略在 `Apps/Src/OffroadApp.cpp` 明确留为 TODO，尚未实现比赛自动驾驶：
 
 1. 使用新鲜超声波数据判断挥手启动和非接触停机，设置阈值、防抖及触发状态。
-2. 白线循迹 PID、差速轮目标及可选编码器速度闭环。
-3. 7 组虚线（50 mm 空白、100 mm 实线）的识别与短时保持策略，区别虚线空白和真正丢线。
-4. 四类障碍及决赛悬崖的通过策略；当前资料的文字部分未给出全部障碍参数，须结合图和实车确认。
-5. 起止黑线识别、起跑脱离判断、三圈计数，以及轮子越线后、触碰前方障碍前停车。
+2. 四类障碍及决赛悬崖的通过策略；当前资料的文字部分未给出全部障碍参数，须结合图和实车确认。
 
 比赛模式的 `OffroadApp::Control()` 会保持停车，包括已绑定驱动、请求进入 WORKING 的情况，
 直至真实控制策略完成。运行中关键传感器过期会取消动作、禁用状态机并调用电机停止接口。

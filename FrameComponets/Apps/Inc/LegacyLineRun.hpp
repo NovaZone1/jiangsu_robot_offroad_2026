@@ -14,8 +14,8 @@ public:
     static constexpr uint32_t StartHoldMs = 1000U;
     static constexpr float StartDistanceMm = 100;
     static constexpr float TargetRpm = 120;
-    static constexpr float DefaultKp = 6.0f;
-    static constexpr float DefaultKd = 0.2f;
+    static constexpr float DefaultKp = 66.0f;
+    static constexpr float DefaultKd = 2.2f;
     static constexpr float MotorKp = 0.001f;
     static constexpr float MotorKi = 0.010f;
     static constexpr float DutyLimit = 0.85f;

@@ -10,10 +10,8 @@
 用户已选择八路 GPIO 数字输入。本实现没有 UART、I2C 或 ADC 依赖。
 型号为 **8-LP**，不采用 8-GS 的接口假设。
 
-- **新增内容**：`Mods/Inc/gray_yahboom_8lp.hpp`、`Mods/Src/gray_yahboom_8lp.cpp`，
-  `Apps/Inc/gray_8lp_example.hpp`、`Apps/Src/gray_8lp_example.cpp`，独立主机测试及本文。
+- **新增内容**：`Mods/Inc/gray_yahboom_8lp.hpp`、`Mods/Src/gray_yahboom_8lp.cpp`。
 - **修改内容**：未修改任何既有文件；未运行会修改 Keil 工程的同步脚本，未创建提交。
-- **可能受影响内容**：未来接入后的灰度自检、新鲜度判断、GPIO 资源、黑白线策略及调度负载。
   新文件目前尚未加入 Keil 工程，也尚未绑定实际硬件，因此不会改变当前固件行为。
 
 ## 仓库审查与可复用约定
@@ -29,7 +27,6 @@
 | `FrameComponets/Mods` | 设备及传感器接口、硬件适配、数据有效性；依赖 BSP，硬件句柄由 Apps 提供 |
 | `FrameComponets/Algorithm` | PID、ADRC、滤波、矩阵等算法；Cortex-M3 软件浮点，不硬编码板级引脚 |
 | `FrameComponets/Sys` | 应用生命周期、System 状态、自检、Action、StateCore、日志和 RTOS 桥接 |
-| `FrameComponets/Apps` | MainFrame 板级绑定、Offroad 比赛流程与循迹解释；调度桥接 RtosCpp 当前直接引用 MainFrame |
 | `MDK-ARM` | Keil 工程及启动文件；新增 `.cpp` 不会自动参加现有工程构建 |
 | `tests/frame`、`tools` | 主机模拟测试、格式检查、工程同步；现有测试脚本显式枚举编译源文件 |
 
@@ -47,11 +44,9 @@
 | `GraySensor::Sample` | 最多 16 路；`line[]` 白色 1、黑色 0；按车体从左到右排列，实际 `channels=8` |
 | `GraySensor::Update` | Reader 返回 false 保留旧样本；返回 true 且 valid=false 使旧样本失效 |
 | `HasFreshSample` | 灰度默认最大年龄 50 ms；使用 HAL 毫秒时间基准 |
-| `GetLineError` | 现有白线质心，且自身不检查新鲜度；黑线示例另加函数，不改其语义 |
 | `Ultrasonic::Reader` | 距离毫米、时间戳、有效性；默认新鲜度 200 ms，保持不动 |
 | `DcMotor::Driver` | 有符号占空比 [-1,1]、可靠 Stop、可选输出轮 RPM 回调；本驱动不控制电机 |
 | `BindHardware` | 现有集中绑定扩展点，当前为空；必须在 GPIO 初始化后注册模块 |
-| `OffroadApp::SampleSensors/Control/Update` | 分开采样、控制和流程；当前 Control 始终停车，实际循迹策略尚未完成 |
 | `System` / `StateCore` / `Action` / `Monitor` | 保持注册、自检、失效停车、状态图、非阻塞动作和有界日志机制 |
 
 配置仍集中在 `Bsps/Inc/frame_config.h`、`.ioc`、`Core/Inc/FreeRTOSConfig.h` 和 Keil 工程。
@@ -137,7 +132,6 @@
 
 ```cpp
 #include "gray_yahboom_8lp.hpp"
-#include "gray_8lp_example.hpp"
 
 static GrayYahboom8Lp Gray8Lp; // BSP 保留内部对象地址，必须长期存在
 
@@ -187,43 +181,6 @@ HAL 和时钟初始化后准备 GPIO，再在 `BindHardware()` 中对现有 `Gra
 不要在初始化里无条件置 true；无需 `HAL_Delay(20000)`，等待期继续运行系统但提供无效样本。
 
 现有 `Offroad.SampleSensors()` 已执行 GrayArray.Update，无需再增加一条采样循环。
-未来控制示例：
-
-```cpp
-const Gray8LpExample::Result line =
-    Gray8LpExample::EvaluateBlackLine(GrayArray.GetSample(), HAL_GetTick());
-// 仅 Left / Center / Right 时使用 line.error；负值线在左，正值线在右。
-// Invalid / NoLine / Ambiguous 交由 Apps 的停车、丢线或路口策略处理。
-// 这里不直接发电机指令，也不替代现有系统自检。
-```
-
-## 黑线位置与四路兼容
-
-采用等间距权重 `{-7,-5,-3,-1,1,3,5,7}`，黑色为贡献项，
-`error = 黑色权重和 / (7 * 黑色通道数)`，范围 [-1,1]。
-若探头实际间距不均，应另增真实位置权重配置，不能把归一化结果直接当毫米。
-本例把任一中央通道或中央两路作为 Center；仍保留实际误差供上层控制使用。
-
-| black_mask | 解释 | 示例结果 |
-| --- | --- | --- |
-| 0x01 | 仅逻辑左一为黑 | Left，-1 |
-| 0x18 | 中央两路为黑 | Center，0 |
-| 0x80 | 仅逻辑右一为黑 | Right，+1 |
-| 0x00 | 未检测到黑线 | NoLine，不直接断定已出赛道 |
-| 0xFF | 全黑 | Ambiguous，可能是宽黑区/横线 |
-| 0x81 | 左右两段黑线 | Ambiguous，需比赛流程上下文 |
-
-`error` 在后三类及 Invalid 时不可用于转向；代码中的默认 0 不是“居中”的证据。
-逐帧误差向负方向发展表示线位置趋向左，向正方向发展表示趋向右；转向电机符号仍需实车验证。
-样本超过 50 ms、通道数不为 8、valid=false 或存在非法值时返回 Invalid。
-
-GraySensor 接口本来支持 16 路，所以公共结构、回调、返回值语义无需改变；只令 channels=8。
-旧调用方若写死 4 次循环、4 位掩码、固定 4 元素数组或旧权重，不能直接继续使用。
-本次未找到活动四路实现，无法替其验证这些假设。
-`Gray8LpExample::ToFourZones(black_mask)` 将相邻 2 路 OR 成一组，返回 0～15；
-bit0 为最左组，1 代表组内出现黑色。这是明确有损的兼容示例，既不等于旧模块原始电平，
-也不保证旧四探头安装位置一致。必须先检查八路帧有效性再转换。
-框架比赛主策略仍是白线；使用白线时保留 GraySensor::GetLineError 并先检查新鲜度。
 
 ## 阈值校准与替换检查
 
@@ -240,8 +197,6 @@ GPIO 模式不能读取/写入数值阈值；本机没有可供设定“ADC 阈�
 
 相比未明确型号的旧四路模块，仅能确认通道由 4 增至 8、信号线和 GPIO 资源增加；
 不能假定旧模块电压、黑白极性、插头针序或孔距与 8-LP 相同。
-把阵列中央两探头之间对齐车体中心，保持左右高度一致；前伸距离、阵列宽度、探头间距改变后，
-重新验证弯道提前量、窄线覆盖、全黑识别和 PID 参数，旧四路调参不应直接视为有效。
 电源应避开电机噪声影响，模块/主控共地；实际高度、遮光和车速条件下测量读数稳定性。
 
 ## 验证与待确认的最小接入方案
@@ -253,7 +208,6 @@ GPIO 模式不能读取/写入数值阈值；本机没有可供设定“ADC 阈�
 .\tests\frame\Run-Gray8LpTests.ps1
 ```
 
-新测试编译真实 bsp_gpio、GraySensor、新驱动和黑线示例，仅模拟 HAL GPIO/时间。
 覆盖非法配置/重复注册、注册中途失败、八路顺序/极性、防抖、采样限速、20 秒预热、
 校准期间旧帧失效、模块重启、毫秒回绕、新鲜度边界、非法数据及全部 256 种掩码。
 使用 C++11、-Wall -Wextra -Werror，无额外依赖。原测试输出位置和入口均未改动。
@@ -272,7 +226,6 @@ GPIO 模式不能读取/写入数值阈值；本机没有可供设定“ADC 阈�
 
 实时调度问题另行提出：最小候选是启用现有 vTaskDelayUntil 支持，核对生成配置并测试
 osDelayUntil 的返回及实际周期。该动作属于既有配置变更，必须先确认，未混入驱动实现。
-循迹电机策略是另外的应用开发，不在本次驱动接入中自动开启。
 
 重点硬件回归：逐路黑白/左右顺序，所有电平组合中的典型左中右/全白/全黑/交叉，
 上电与校准期间保持未就绪，真实模块掉电/断线的系统行为，50 ms 过期停车，

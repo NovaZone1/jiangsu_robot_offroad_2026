@@ -7,7 +7,7 @@
 
 ## 1. 当前工程状态
 
-- 当前交付四轮 PID 清理版：上电禁能，恢复 LineFollowBoard 选择的应用；启动需校准、自检和显式请求。
+- 当前交付四轮 PID 清理版：上电禁能，启动需校准、自检和显式请求。
   自动持续试转入口已删除；MotorContinuousTest 仅位于 tests/frame/fixtures，不参与固件编译。
   Nova 蓝牙通信与调参协议保留，`NOVA_MOTOR_TUNING=0` 默认关闭 AI 运动控制。
   主分支四轮正反转 Kp/Ki/Kd 全部为 0，不保存个人参数或调参报告；设备分支规则见 [分支约定](ROBOT_VARIANT.md)。
@@ -21,7 +21,6 @@
   主分支四轮正反转 Kp=Ki=Kd=0，滤波 0.03 秒、PWM/积分限幅 0.69、目标上限 180 RPM。
   电机调参数据仅保存在设备分支，不随公共分支发布；历史提交不改写。
 - 用户已确认八路灰度 OLED 测试正常。接线 x1～x8 为 PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1。
-  正式循迹仍需要预热、操作者确认 KEY1 校准和新鲜有效样本；不自动伪造校准成功。
 - 保留原厂超声波驱动并在 MainFrame 绑定：PF11 TRIG、PF12 ECHO、TIM7、EXTI12、DWT。
   OLED 为 I2C1 PB6/PB7，SSD1306 128×32、地址 0x3C。中断只保留一个实现。
 - 已按用户要求清理固件中的电机自动试转、超声波距离显示、灰度显示入口和测试宏。
@@ -30,8 +29,6 @@
   保留方向、无转速、超速、反馈/驱动故障、50 ms 调度中断及故障锁定，异常禁能四轮。
   停稳等待接口保留 1 秒最小滑行、低于 6 RPM 持续 100 ms、3 秒超时；不会自动反向或重启。
   使用与恢复步骤见 [电机保护](docs/motor_protection.md)。DcMotor 原命令超时、限幅和输入检查保留。
-- 恢复原 LineFollowBoard 选择的应用（目前循迹 Enabled=true），上电禁能并等待校准、自检和显式启动。
-  循迹原 OLED 轮速显示保留；不再显示临时灰度/超声波诊断界面。
   OffroadApp 仍未实现完整越野比赛策略，挥手启动、障碍及整车联合验证仍待开发。
 - 清理版通过主机回归和 V6 完整重编译，0 Error / 0 Warning；测试和编译不代替整车实测。
 
@@ -57,7 +54,7 @@
 | Bsps | MCU 外设操作，不包含比赛判断和具体传感器协议 |
 | Mods | 具体设备驱动、协议、标定、数据有效性及设备接口 |
 | Algorithm | PID、滤波、矩阵等可复用算法，不硬编码 GPIO 或比赛路线 |
-| Apps | 板级绑定、挥手启动/停止、循迹、虚线、障碍、圈数和终点策略 |
+| Apps | 板级绑定、挥手启动/停止、虚线、障碍、圈数和终点策略 |
 | Sys | 应用生命周期、自检、调度、状态机、动作和日志 |
 
 优先保留现有公开接口。模块正常开发不需要各自改写 `System` 或另建一套调度器。
@@ -77,7 +74,7 @@
 | 下载 / 调试 | PA13 SWDIO / PA14 SWCLK，SWD | 共享 | 当前 DAPLink，Keil 选择 CMSIS-DAP Debugger；保留 SWD 引脚，不得复用 |
 | 原厂超声波 | PF11 TRIG、PF12 ECHO / EXTI12，TIM7 | 超声波 | 原厂接口，20 us 触发、60 ms 间隔、35 ms 超时；DWT 采集回波 |
 | 灰度阵列 | x1～x8：PC0/PC1/PC2/PC3/PA4/PA5/PB0/PB1 | 灰度 | 用户确认接线；8-LP 数字输入，OLED 按 x1～x8 显示；车体左右方向待安装确认 |
-| 原厂 OLED | I2C1 PB6/PB7，0x3C，128×32 | 显示 | 保留可复用驱动和循迹轮速显示；I2C1 IRQ 由 bsp_oled_bus 独占 |
+| 原厂 OLED | I2C1 PB6/PB7，0x3C，128×32 | 显示 | 保留可复用驱动；I2C1 IRQ 由 bsp_oled_bus 独占 |
 | 状态 LED | 待定 | 三人协商 | 写明引脚和有效电平 |
 | TIM6 | HAL 时间基准，已占用 | 共享 | 不得用于电机、编码器或超声波 |
 
@@ -165,15 +162,12 @@ bool ReadGray(void *context, GraySensor::Sample *sample);
 
 - 按实际模块选择 GPIO、ADC 或 UART 采集，通道数不能超过 `FRAME_GRAY_MAX_CHANNELS`（当前 16）。
 - 团队通道顺序约定：车头朝前时，从车体左侧到右侧依次放入 `line[0..channels-1]`。
-  现有 `GetLineError()` 因此产生左负、右正的加权位置误差；PID 转向符号由上层联调确认。
 - 标定后的值统一为 `[0, 1]`：白色引导线趋近 1，背景/黑色趋近 0。
   原始 ADC 值、数字有效电平或协议数值的差异在驱动内转换。
 - 写明逐通道标定方法和保存方式；数字型传感器可以输出 0/1，但不能声称具有模拟分辨率。
 - 交付一帧完整数据，不能把不同采样时刻、半更新的通道数组直接暴露给上层。
 - Reader 的返回值和无效样本约定与超声波相同：无新帧返回 `false`；新帧失败则返回 `true` 且 `valid = false`。
 - 时间戳使用与 `HAL_GetTick()` 一致的毫秒基准，只更新新帧；默认新鲜度为 50 ms。
-- `GetLineError()` 返回 `false` 表示当前数据不能计算线位置，不等于已经确定“驶离赛道”。
-  虚线空白、黑色终点线和真正丢线的区分属于 Apps。
 - 当前 ADC BSP 只有单通道单次读取；多通道扫描/DMA 需要补充适配器，不能把阻塞扫描塞进 1 ms Reader。
 
 验收至少覆盖：通道顺序、白/黑标定、线在左/中/右时的误差、全背景、全白、非法数值、
@@ -209,7 +203,7 @@ GrayArray.Bind(&gray_context, ReadGray);
   不得在各模块重复定义同名 `HAL_GPIO_EXTI_Callback`、`HAL_UART_RxCpltCallback` 或 RX Event 回调。
 - 原 bsp_uart 仍提供普通 DMA；USART1 由独立 bsp_uart1_dma 实现循环 DMA 增量处理，不能重复注册。
   USART1 / DMA1 CH4/5 的 IRQ 在该 BSP 中唯一实现，不占用已有 HAL UART 回调。
-  Bluetooth 负责透传，NovaProtocol 负责协议，NovaLink 负责四轮/循迹参数绑定；详见 [蓝牙与 Nova](docs/bluetooth_nova.md)。
+  Bluetooth 负责透传，NovaProtocol 负责协议，NovaLink 负责四轮参数绑定；详见 [蓝牙与 Nova](docs/bluetooth_nova.md)。
   可选单轮调参模式（默认关闭）已绑定 configure/heartbeat/set_target，仅 `NOVA_TUNING_PORT` 指定通道宣告完整自动能力。
   所选电机使用 DcMotor 可选 D-on-measurement；其他电机和比赛模式仍使用原 D-on-error，不得混淆参数。
   心跳 0.8～2 秒、单轮 45 秒硬上限、目标绝对上限 150 RPM、PWM 硬上限 0.69；异常锁定至复位。
@@ -224,7 +218,6 @@ GrayArray.Bind(&gray_context, ReadGray);
 
 ## 8. 比赛策略与公共文件
 
-比赛规则和具体策略集中在 Apps：白线循迹、三圈、挥手启动/非接触停机、虚线、障碍和终点停车。
 准备完成后 LED 常亮、行驶时有节奏闪烁的逻辑已经在 System 中。
 各模块交付可信设备数据和控制接口，路线判定、阈值和状态切换由集成时共同完成。
 遇到规则细节不明确时查阅实际比赛文件，不在驱动层自行假定完成圈数或越障成功。

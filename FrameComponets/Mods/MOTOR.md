@@ -11,7 +11,7 @@
 本板的输出极性、编码器方向和死区补偿另对照用户提供的亚博 `car_tracking` 源码：
 `C:/Users/Administrator/Desktop/STM32开发板小车/6、程序源码汇总/STM32_CAR源码汇总/STM32_CAR源码汇总/3.Smart_Car_Course/1.car_tracking/car_tracking`。
 参考文件为 `BSP/motor/bsp_motor.c/.h`、`BSP/encoder/bsp_encoder.c`、`Core/Src/tim.c`，参考目录保持原样。
-没有复制该工程的循迹、机械轮尺寸或 TIM6 调度；本项目保留 RPM 单位和 FreeRTOS 默认任务。
+没有复制该工程的机械轮尺寸或 TIM6 调度；本项目保留 RPM 单位和 FreeRTOS 默认任务。
 
 ## 文件及职责
 
@@ -161,9 +161,7 @@ DcMotor 原命令/反馈超时、非法输入、输出失败、限幅及 PID 保
 
 ## 当前应用与验证
 
-当前恢复原 LineFollowBoard 选择的应用，不再编译自动试车或传感器诊断。
-MainFrame 绑定四轮 MotorSafety 和原厂超声波；循迹入口保留原灰度预热、操作者校准、自检和显式启动。
-四轮初始化后禁能，保护模块不使能电机；循迹原 OLED 轮速显示保留。
+四轮初始化后禁能，保护模块不使能电机。
 使用 DAPLink / CMSIS-DAP 下载工程的正常 AXF，新独立 HEX 为 `MDK-ARM/main_zero_pid.hex`。
 历史试车 HEX 不属于当前清理版；源码变化只有下载新固件后才会影响开发板。
 

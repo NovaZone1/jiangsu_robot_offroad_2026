@@ -223,7 +223,7 @@ int main(int argc, char **argv)
     }
     assert(calibrated);
     const auto cfg = line.GetTrackConfig();
-    assert(cfg.base_rpm == 120 && cfg.kp == 6 && cfg.ki == 0 && cfg.kd == .2f);
+    assert(cfg.base_rpm == 120 && cfg.kp == 66 && cfg.ki == 0 && cfg.kd == 2.2f);
     assert(cfg.turn_rpm == 72 && cfg.maximum_diff_rpm == 60 && cfg.gap_hold_ms == 207);
     assert(cfg.curve_boost_rpm == 0 && cfg.curve_speed_drop_rpm == 0);
     Tick(1100);

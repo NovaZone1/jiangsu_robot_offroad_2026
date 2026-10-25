@@ -1,7 +1,7 @@
 # 超声波 OLED 测试记录
 
 临时超声波距离显示入口已按用户要求从固件清理。
-原厂超声波驱动保留并在 MainFrame 绑定，OLED 驱动与循迹轮速显示保留。
+原厂超声波驱动保留并在 MainFrame 绑定，OLED 驱动保留。
 RangeDisplayApp 仅位于 tests/frame/fixtures，用于主机联动回归，不参与 Keil 构建。
 
 资源：PF11/TRIG、PF12/ECHO、TIM7、EXTI12、DWT；OLED 为 PB6/PB7、I2C1、0x3C、128×32。
