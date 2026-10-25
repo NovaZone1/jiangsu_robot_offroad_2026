@@ -6,7 +6,7 @@ static_assert(FRAME_GRAY_MAX_CHANNELS >= GrayYahboom8Lp::ChannelCount,
 bool GrayYahboom8Lp::Init(const Channel (&channels)[ChannelCount], const Config &config)
 {
     if (init_attempted_ || config.sample_period_ms == 0 || config.sample_period_ms > 50 ||
-        config.debounce_samples == 0 || config.debounce_samples > 8)
+        config.debounce_samples == 0 || config.debounce_samples > 8 || config.warmup_ms > WarmupMs)
     {
         return false;
     }
@@ -61,7 +61,8 @@ void GrayYahboom8Lp::ConfirmCalibration(bool calibrated)
 bool GrayYahboom8Lp::IsReady() const
 {
     return initialized_ && calibrated_ &&
-           (warmup_complete_ || (uint32_t)(HAL_GetTick() - initialized_at_ms_) >= WarmupMs);
+           (warmup_complete_ ||
+            (uint32_t)(HAL_GetTick() - initialized_at_ms_) >= config_.warmup_ms);
 }
 
 void GrayYahboom8Lp::NotifyPowerOn()
@@ -79,7 +80,8 @@ bool GrayYahboom8Lp::Poll()
         return false;
     }
 
-    warmup_complete_ = warmup_complete_ || (uint32_t)(now - initialized_at_ms_) >= WarmupMs;
+    warmup_complete_ =
+        warmup_complete_ || (uint32_t)(now - initialized_at_ms_) >= config_.warmup_ms;
     Frame next = {};
     for (uint8_t i = 0; i < ChannelCount; ++i)
     {

@@ -22,7 +22,7 @@ public:
         Source source = Source::None;
     };
 
-    bool Init(float maximum_rpm = 60, uint32_t timeout_ms = 50);
+    bool Init(float maximum_rpm = 60, uint32_t timeout_ms = 50, bool allow_180_rpm = false);
     bool SetTrackSpeed(float base_rpm, float speed_diff_rpm, uint32_t now_ms);
     bool SetFollowOffset(float offset_rpm, uint32_t now_ms);
     bool SetDirectSpeed(Source source, float left_rpm, float right_rpm, uint32_t now_ms);

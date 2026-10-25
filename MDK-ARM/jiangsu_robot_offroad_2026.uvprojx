@@ -334,7 +334,7 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_HAL_DRIVER,STM32F103xE,HAL_ADC_MODULE_ENABLED,HAL_UART_MODULE_ENABLED,ARM_MATH_CM3</Define>
+              <Define>USE_HAL_DRIVER,STM32F103xE,HAL_ADC_MODULE_ENABLED,HAL_UART_MODULE_ENABLED,ARM_MATH_CM3,LINE_FOLLOW_ULTRASONIC_START=1</Define>
               <Undefine></Undefine>
               <IncludePath>../Core/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM3;../Drivers/CMSIS/Device/ST/STM32F1xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../FrameComponets/Bsps/Inc;../FrameComponets/Mods/Inc;../FrameComponets/Sys/Inc;../FrameComponets/Apps/Inc;../FrameComponets/Algorithm/Inc</IncludePath>
             </VariousControls>
@@ -840,6 +840,11 @@
               <FileName>LineFollowApp.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>../FrameComponets/Apps/Src/LineFollowApp.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>LegacyLineRun.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>..\FrameComponets\Apps\Src\LegacyLineRun.cpp</FilePath>
             </File>
             <File>
               <FileName>LineFollowBoard.cpp</FileName>

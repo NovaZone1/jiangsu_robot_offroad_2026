@@ -16,8 +16,12 @@ bool Track::Init(const Config &config)
     if (!Nonnegative(config.base_rpm) || !Nonnegative(config.turn_rpm) ||
         !Nonnegative(config.gap_rpm) || !Nonnegative(config.search_rpm) ||
         !Nonnegative(config.search_diff_rpm) || !Nonnegative(config.maximum_diff_rpm) ||
-        !Nonnegative(config.kp) || !Nonnegative(config.kd) || !Nonnegative(config.ki) ||
-        !Nonnegative(config.integral_limit_rpm) || config.integral_limit_rpm == 0 ||
+        !Nonnegative(config.curve_boost_rpm) || config.curve_boost_rpm > config.maximum_diff_rpm ||
+        !Nonnegative(config.curve_speed_drop_rpm) ||
+        config.curve_speed_drop_rpm > config.turn_rpm || !Nonnegative(config.curve_start_error) ||
+        config.curve_start_error >= 1 || !Nonnegative(config.kp) || !Nonnegative(config.kd) ||
+        !Nonnegative(config.ki) || !Nonnegative(config.integral_limit_rpm) ||
+        config.integral_limit_rpm == 0 ||
         (config.ki > 0 && config.integral_limit_rpm > config.maximum_diff_rpm) ||
         !Nonnegative(config.error_filter_tau_s) || config.base_rpm <= 0 ||
         config.turn_rpm > config.base_rpm || config.gap_rpm > config.base_rpm ||
@@ -41,9 +45,10 @@ void Track::Reset()
     command_ = {};
     pid_.Reset();
     last_sample_ms_ = last_line_ms_ = filter_ms_ = 0;
-    filtered_error_ = last_diff_rpm_ = last_direction_ = 0;
+    filtered_error_ = last_diff_rpm_ = last_direction_ = last_base_rpm_ = 0;
     reacquire_count_ = 0;
     sampled_ = seen_line_ = filter_valid_ = false;
+    gap_hold_allowed_ = false;
 }
 
 bool Track::FindLine(const GraySensor::Sample &sample, float &error) const
@@ -97,7 +102,7 @@ void Track::HandleMissingLine(uint32_t now_ms)
     if (missing_ms <= config_.gap_hold_ms)
     {
         command_.state = State::GapHold;
-        command_.base_rpm = config_.gap_rpm;
+        command_.base_rpm = gap_hold_allowed_ ? last_base_rpm_ : config_.gap_rpm;
         command_.speed_diff_rpm = last_diff_rpm_;
     }
     else
@@ -136,6 +141,18 @@ void Track::Follow(float error, uint32_t sample_ms)
     command_.speed_diff_rpm = pid_.Calc(filtered_error_, 0, config_.maximum_diff_rpm);
     command_.base_rpm =
         config_.base_rpm - (config_.base_rpm - config_.turn_rpm) * fabsf(filtered_error_);
+    if (fabsf(filtered_error_) > config_.curve_start_error)
+    {
+        // Preserve the actual centroid and center response; ramp steering only near the edges.
+        const float fraction = fminf(1, (fabsf(filtered_error_) - config_.curve_start_error) /
+                                            (1 - config_.curve_start_error));
+        const float amount = config_.curve_linear_ramp ? fraction : fraction * fraction;
+        const float boost = config_.curve_boost_rpm * amount * (filtered_error_ > 0 ? 1 : -1);
+        command_.speed_diff_rpm =
+            fmaxf(-config_.maximum_diff_rpm,
+                  fminf(config_.maximum_diff_rpm, command_.speed_diff_rpm + boost));
+        command_.base_rpm -= config_.curve_speed_drop_rpm * amount;
+    }
     command_.line_error = filtered_error_;
     command_.timestamp_ms = sample_ms;
     command_.state = State::Following;
@@ -186,6 +203,20 @@ const Track::Command &Track::Update(const GraySensor::Sample &sample, uint32_t n
     float error = 0;
     if (!FindLine(sample, error))
     {
+        bool blank = true;
+        for (uint8_t i = 0; i < sample.channels; ++i)
+        {
+            const float value = config_.white_line ? sample.line[i] : 1.0f - sample.line[i];
+            blank = blank && value < 0.5f;
+        }
+        if (command_.state == State::Following)
+        {
+            gap_hold_allowed_ = config_.hold_last_on_gap && blank;
+        }
+        if (!blank)
+        {
+            gap_hold_allowed_ = false; // Wide/separated marks never get high-speed blank hold.
+        }
         reacquire_count_ = 0;
         HandleMissingLine(now_ms);
         return command_;
@@ -205,6 +236,8 @@ const Track::Command &Track::Update(const GraySensor::Sample &sample, uint32_t n
     last_line_ms_ = sample.timestamp_ms;
     reacquire_count_ = 0;
     Follow(error, sample.timestamp_ms);
+    last_base_rpm_ = command_.base_rpm;
+    gap_hold_allowed_ = false;
     return command_;
 }
 

@@ -13,8 +13,9 @@ bool LineFollowApp::Init(const Config &config)
     initialized_ = false;
     if (!isfinite(config.acceleration_rpm_s) || config.acceleration_rpm_s <= 0 ||
         !isfinite(config.deceleration_rpm_s) || config.deceleration_rpm_s <= 0 ||
+        !isfinite(config.steering_slew_rpm_s) || config.steering_slew_rpm_s <= 0 ||
         !isfinite(config.maximum_rpm) || config.track.base_rpm > config.maximum_rpm ||
-        !track_.Init(config.track) || !mixer_.Init(config.maximum_rpm))
+        !track_.Init(config.track) || !mixer_.Init(config.maximum_rpm, 50, config.allow_180_rpm))
     {
         return false;
     }
@@ -96,6 +97,7 @@ void LineFollowApp::StopMotors()
     track_.Reset();
     mixer_.ClearAll();
     running_ = false;
+    submitted_base_rpm_ = submitted_diff_rpm_ = 0;
 }
 
 bool LineFollowApp::ApplySpeeds(const SpeedMixer::WheelSpeeds &speeds, float dt)
@@ -112,17 +114,40 @@ bool LineFollowApp::ApplySpeeds(const SpeedMixer::WheelSpeeds &speeds, float dt)
     {
         return false;
     }
+    if (config_.split_steering_slew)
+    {
+        const float desired_base = (speeds.rpm[0] + speeds.rpm[2]) * 0.5f;
+        const float desired_diff = (speeds.rpm[0] - speeds.rpm[2]) * 0.5f;
+        const float base_change = desired_base - submitted_base_rpm_;
+        const float base_limit =
+            (base_change >= 0 ? config_.acceleration_rpm_s : config_.deceleration_rpm_s) * dt;
+        submitted_base_rpm_ += fmaxf(-base_limit, fminf(base_change, base_limit));
+        const float diff_limit = config_.steering_slew_rpm_s * dt;
+        submitted_diff_rpm_ +=
+            fmaxf(-diff_limit, fminf(desired_diff - submitted_diff_rpm_, diff_limit));
+        const float headroom =
+            fmaxf(0, fminf(submitted_base_rpm_, config_.maximum_rpm - submitted_base_rpm_));
+        submitted_diff_rpm_ = fmaxf(-headroom, fminf(submitted_diff_rpm_, headroom));
+    }
     for (uint8_t index = 0; index < 4; ++index)
     {
         if (!all_enabled && !motors_[index]->Enable())
         {
             return false;
         }
-        const float change = speeds.rpm[index] - submitted_rpm_[index];
-        const float limit =
-            (change >= 0 ? config_.acceleration_rpm_s : config_.deceleration_rpm_s) * dt;
-        const float increment = change > limit ? limit : (change < -limit ? -limit : change);
-        submitted_rpm_[index] += increment;
+        if (config_.split_steering_slew)
+        {
+            submitted_rpm_[index] =
+                submitted_base_rpm_ + (index < 2 ? submitted_diff_rpm_ : -submitted_diff_rpm_);
+        }
+        else
+        {
+            const float change = speeds.rpm[index] - submitted_rpm_[index];
+            const float limit =
+                (change >= 0 ? config_.acceleration_rpm_s : config_.deceleration_rpm_s) * dt;
+            const float increment = change > limit ? limit : (change < -limit ? -limit : change);
+            submitted_rpm_[index] += increment;
+        }
         if (!motors_[index]->SetSpeed(submitted_rpm_[index]))
         {
             return false;
@@ -156,6 +181,7 @@ void LineFollowApp::Control()
     {
         track_.Reset();
         mixer_.ClearAll();
+        submitted_base_rpm_ = submitted_diff_rpm_ = 0;
         running_ = true;
         last_control_ms_ = now - FRAME_SYSTEM_PERIOD_MS;
     }
@@ -183,6 +209,7 @@ void LineFollowApp::Control()
     if (!command.valid)
     {
         mixer_.ClearAll();
+        submitted_base_rpm_ = submitted_diff_rpm_ = 0;
         for (uint8_t index = 0; index < 4; ++index)
         {
             motors_[index]->Disable();

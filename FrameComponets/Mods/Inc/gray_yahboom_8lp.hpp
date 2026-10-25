@@ -25,6 +25,7 @@ public:
     {
         uint32_t sample_period_ms = 1;
         uint8_t debounce_samples = 2; // Consecutive host samples, not module ADC frames.
+        uint32_t warmup_ms = WarmupMs; // Explicit board configuration may explicitly shorten this.
     };
 
     struct Frame

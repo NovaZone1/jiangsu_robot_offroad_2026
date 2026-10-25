@@ -230,7 +230,9 @@ void RunMotorProtectionTests()
         rig.Step(10);
         assert(!rig.guard.CanResumeAfterCoast() && !rig.guard.ReleaseCoastStop());
         rig.drift = 0;
-        rig.Step(110);
+        rig.Step(999);
+        assert(!rig.guard.CanResumeAfterCoast());
+        rig.Step(1);
         assert(rig.guard.CanResumeAfterCoast()); // Require fresh stable feedback again.
         assert(rig.guard.ReleaseCoastStop() && !rig.guard.IsCoasting());
     }
@@ -251,6 +253,21 @@ void RunMotorProtectionTests()
         MotorProtection duplicate(rig.motors[0], rig.motors[0], rig.motors[2], rig.motors[3]);
         assert(!duplicate.Init());
         assert(duplicate.GetStatus().fault == Fault::NotReady);
+    }
+    {
+        Rig rig(UINT32_MAX - 1500U);
+        assert(rig.guard.RequestCoastStop());
+        rig.Step(5000);
+        assert(rig.guard.CanResumeAfterCoast());
+        rig.drift = 30;
+        rig.Step(10);
+        assert(rig.guard.GetStatus().fault == Fault::None);
+        assert(!rig.guard.CanResumeAfterCoast());
+        assert(!rig.guard.RequestCoastStop());
+        rig.Step(2989);
+        assert(rig.guard.GetStatus().fault == Fault::None);
+        rig.Step(11);
+        rig.Failed(Fault::CoastTimeout, 0);
     }
     puts("PASS: production motor protection, direction/stall/overspeed, timing, feedback, "
          "driver faults, latch, coast interlock and tick rollover");

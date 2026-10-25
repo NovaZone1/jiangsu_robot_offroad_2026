@@ -7,6 +7,7 @@
 #include "bsp_dwt.h"
 #include "cmsis_os.h"
 #include "NovaLink.hpp"
+#include "LegacyLineRun.hpp"
 
 void MainInitCpp(void)
 {
@@ -18,6 +19,11 @@ void FrameTickCpp(void)
 {
     static uint8_t prescaler = 0;
     BspDwt_CntUpdate();
+    if (LegacyLineRun::Enabled)
+    {
+        LegacyLine.Run();
+        return; // One owner, with its own pre/post control protection checks.
+    }
     NovaLink.Service();
     if (!MotorSafety.BeforeControl())
     {

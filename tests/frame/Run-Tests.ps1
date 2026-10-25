@@ -30,3 +30,5 @@ if ($LASTEXITCODE -ne 0) { throw "Host tests failed: $LASTEXITCODE" }
 & (Join-Path $PSScriptRoot 'Run-LineFollowTests.ps1') -Compiler $Compiler
 & (Join-Path $PSScriptRoot 'Run-NovaTests.ps1') -Compiler $Compiler
 & (Join-Path $PSScriptRoot 'Run-M1ContinuousTests.ps1') -Compiler $Compiler
+
+& (Join-Path $PSScriptRoot 'Run-LegacyLineTests.ps1') -Compiler $Compiler

@@ -10,7 +10,7 @@ namespace
     GrayYahboom8Lp gray_driver;
 } // namespace
 
-bool LineFollowBoard::InitGray(GraySensor &gray)
+bool LineFollowBoard::InitGray(GraySensor &gray, uint32_t warmup_ms)
 {
     // Confirmed wiring: x1 is vehicle left, x8 right; BLACK=low, WHITE=high.
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -31,6 +31,7 @@ bool LineFollowBoard::InitGray(GraySensor &gray)
         {GPIOA, GPIO_PIN_4, GPIO_PIN_RESET}, {GPIOA, GPIO_PIN_5, GPIO_PIN_RESET},
         {GPIOB, GPIO_PIN_0, GPIO_PIN_RESET}, {GPIOB, GPIO_PIN_1, GPIO_PIN_RESET}};
     GrayYahboom8Lp::Config config;
+    config.warmup_ms = warmup_ms;
     if (!gray_driver.Init(channels, config))
     {
         return false;

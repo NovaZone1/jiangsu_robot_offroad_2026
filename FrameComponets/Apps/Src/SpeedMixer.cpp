@@ -1,11 +1,12 @@
 #include "SpeedMixer.hpp"
 #include <math.h>
 
-bool SpeedMixer::Init(float maximum_rpm, uint32_t timeout_ms)
+bool SpeedMixer::Init(float maximum_rpm, uint32_t timeout_ms, bool allow_180_rpm)
 {
     ClearAll();
-    initialized_ = isfinite(maximum_rpm) && maximum_rpm > 0 && maximum_rpm <= 160 &&
-                   timeout_ms > 0 && timeout_ms <= 100;
+    initialized_ = isfinite(maximum_rpm) && maximum_rpm > 0 &&
+                   maximum_rpm <= (allow_180_rpm ? 180 : 160) && timeout_ms > 0 &&
+                   timeout_ms <= 100;
     if (initialized_)
     {
         maximum_rpm_ = maximum_rpm;

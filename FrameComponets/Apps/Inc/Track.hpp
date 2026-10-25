@@ -26,12 +26,17 @@ public:
         float search_rpm = 20;
         float search_diff_rpm = 18;
         float maximum_diff_rpm = 24;
+        float curve_boost_rpm = 0; // Opt-in outer-error steering, zero preserves legacy PD.
+        float curve_speed_drop_rpm = 0; // Extra base reduction at full outer error.
+        float curve_start_error = 0.4f; // Normalized absolute error; central PD stays unchanged.
+        bool curve_linear_ramp = false; // Earlier outer steering; legacy curve remains quadratic.
         float kp = 28; // RPM per normalized line error.
         float kd = 0.25f; // RPM seconds per normalized line error.
         float ki = 0; // Default behavior remains PD; integral output is bounded in RPM.
         float integral_limit_rpm = 6;
         float error_filter_tau_s = 0.025f;
         bool white_line = true;
+        bool hold_last_on_gap = false; // Explicit APP policy for bounded blank dashed segments.
         uint8_t reacquire_samples = 3;
         uint32_t sample_timeout_ms = 50;
         uint32_t gap_hold_ms = 120;
@@ -66,10 +71,12 @@ private:
     uint32_t filter_ms_ = 0;
     float filtered_error_ = 0;
     float last_diff_rpm_ = 0;
+    float last_base_rpm_ = 0;
     float last_direction_ = 0;
     uint8_t reacquire_count_ = 0;
     bool initialized_ = false;
     bool sampled_ = false;
     bool seen_line_ = false;
     bool filter_valid_ = false;
+    bool gap_hold_allowed_ = false;
 };

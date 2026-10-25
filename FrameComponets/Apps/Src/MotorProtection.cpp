@@ -168,6 +168,9 @@ bool MotorProtection::AfterControl()
     if (status_.coast == Coast::Ready && !stopped)
     {
         status_.coast = Coast::Waiting;
+        // A completed stop has no live deadline. Manual movement starts one new bounded
+        // standstill check; continued movement while Waiting must never refresh this timer.
+        coast_since_ = now;
         still_ = false;
     }
     if (status_.coast == Coast::Waiting)

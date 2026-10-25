@@ -4,6 +4,10 @@
 #include "LineFollowBoard.hpp"
 #include "ultrasonic_factory.hpp"
 #include "NovaLink.hpp"
+#include "LegacyLineRun.hpp"
+
+static_assert(!LegacyLineRun::Enabled || !NovaLinkApp::MotorTuningEnabled,
+              "Select only one motor command owner");
 
 MotorPwmDriver Motor1Driver, Motor2Driver, Motor3Driver, Motor4Driver;
 DcMotor Motor1, Motor2, Motor3, Motor4;
@@ -20,6 +24,8 @@ Ultrasonic RangeSensor;
 GraySensor GrayArray;
 OffroadApp Offroad(LeftMotor, RightMotor, RangeSensor, GrayArray);
 Led StatusLed;
+LegacyLineRun LegacyLine(GrayArray, RangeSensor, LineFollow, Motor1, Motor2, Motor3, Motor4,
+                         MotorSafety);
 
 namespace
 {
@@ -55,7 +61,8 @@ namespace
             config.encoder_reverse = encoder_reverse[index];
             // 520 初始 PI 使用实际 PWM，不叠加旧的固定死区补偿。
             config.deadzone_duty = 0;
-            config.maximum_duty = MotorSpeedProfiles::duty_limit;
+            config.maximum_duty =
+                LegacyLineRun::Enabled ? LegacyLineRun::DutyLimit : MotorSpeedProfiles::duty_limit;
             if (!drivers[index]->Init(config))
             {
                 return false;
@@ -87,8 +94,10 @@ namespace
         }
         if (LineFollowBoard::Enabled)
         {
-            LineFollowApp::Config config;
-            if (!LineFollowBoard::InitGray(GrayArray) || !LineFollow.Init(config))
+            const auto config =
+                LegacyLineRun::Enabled ? LegacyLineRun::Configuration() : LineFollowApp::Config();
+            if (!LineFollowBoard::InitGray(GrayArray, LegacyLineRun::Enabled ? 0 : 20000U) ||
+                !LineFollow.Init(config))
             {
                 return false;
             }
@@ -127,7 +136,7 @@ void MainFrameCpp()
 {
     System.BindStopHandler(StopAll);
     System.BindIndicator(SetIndicator);
-    if (!NovaLink.Init())
+    if (!LegacyLineRun::Enabled && !NovaLink.Init())
     {
         System.monitor.LogError("USART1 Bluetooth initialization failed");
     }
@@ -141,6 +150,14 @@ void MainFrameCpp()
     {
         System
             .Stop(); // Explicitly idle; only Nova's selected single-motor trial may enable a wheel.
+        return;
+    }
+    if (LegacyLineRun::Enabled)
+    {
+        if (!System.RegistApp(LineFollow) || !LegacyLine.Init(LineFollowBoard::ConfirmCalibration))
+        {
+            System.Stop(true);
+        }
         return;
     }
     Application &app = LineFollowBoard::Enabled ? static_cast<Application &>(LineFollow)

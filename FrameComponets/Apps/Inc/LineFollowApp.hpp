@@ -13,8 +13,11 @@ public:
     {
         Track::Config track;
         float maximum_rpm = 60;
+        bool allow_180_rpm = false; // Explicit board opt-in; generic mixer guard stays 160.
         float acceleration_rpm_s = 120;
         float deceleration_rpm_s = 240;
+        bool split_steering_slew = false;
+        float steering_slew_rpm_s = 240; // Half left/right difference per second.
     };
 
     LineFollowApp(GraySensor &gray, DcMotor &m1, DcMotor &m2, DcMotor &m3, DcMotor &m4);
@@ -43,6 +46,7 @@ private:
     MotorSpeedDisplay display_;
     Config config_;
     float submitted_rpm_[4] = {};
+    float submitted_base_rpm_ = 0, submitted_diff_rpm_ = 0;
     uint32_t last_control_ms_ = 0;
     bool initialized_ = false;
     bool running_ = false;

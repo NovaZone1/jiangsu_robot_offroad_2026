@@ -15,3 +15,6 @@ extern GraySensor GrayArray;
 extern OffroadApp Offroad;
 extern Led StatusLed;
 void MainFrameCpp();
+
+class LegacyLineRun;
+extern LegacyLineRun LegacyLine;
