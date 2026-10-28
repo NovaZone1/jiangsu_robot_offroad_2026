@@ -13,9 +13,13 @@ public:
     static constexpr bool Enabled = LINE_FOLLOW_ULTRASONIC_START != 0;
     static constexpr uint32_t StartHoldMs = 1000U;
     static constexpr float StartDistanceMm = 100;
-    static constexpr float TargetRpm = 120;
-    static constexpr float DefaultKp = 66.0f;
-    static constexpr float DefaultKd = 2.2f;
+    static constexpr float TargetRpm = 180;
+    static constexpr float BaseRpm = 120;
+    static constexpr float DefaultKp = 28.0f;
+    static constexpr float DefaultKd = 0.25f;
+    static constexpr float TurnKp = 28.0f;
+    static constexpr float TurnKi = 0;
+    static constexpr float TurnKd = 0.25f;
     static constexpr float MotorKp = 0.001f;
     static constexpr float MotorKi = 0.010f;
     static constexpr float DutyLimit = 0.85f;

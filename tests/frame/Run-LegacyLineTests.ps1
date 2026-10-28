@@ -16,6 +16,7 @@ $taskExe = "$PSScriptRoot/out/legacy_line_run_tests.exe"
 if ($LASTEXITCODE -ne 0) { throw 'Legacy line test build failed' }
 $taskScenarios = @('gate','normal','wrap','boundary','range_invalid','cached','no_line','wide_line','separated_line','early_stop','external_enable','reset_hold','gray_stale','loss','gap')
 $taskScenarios += @('one_second','near70','target_bound','dashed')
+$taskScenarios += @('course_planner','finish_gate','course_three_laps','course_three_laps_left','no_time_limit')
 foreach ($taskPort in 1,2,3,4) {
     foreach ($taskFault in 'disabled','feedback','driver','overspeed','direction','stall','saturation') {
         $taskScenarios += "${taskFault}_$taskPort"

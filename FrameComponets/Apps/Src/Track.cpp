@@ -27,6 +27,10 @@ bool Track::Init(const Config &config)
         config.turn_rpm > config.base_rpm || config.gap_rpm > config.base_rpm ||
         config.search_rpm > config.base_rpm || config.search_diff_rpm > config.search_rpm ||
         config.maximum_diff_rpm > config.base_rpm || config.reacquire_samples == 0 ||
+        (config.dual_pid &&
+         (!Nonnegative(config.turn_kp) || !Nonnegative(config.turn_ki) ||
+          !Nonnegative(config.turn_kd) || !Nonnegative(config.turn_base_limit_rpm) ||
+          config.turn_base_limit_rpm <= 0 || config.turn_base_limit_rpm > config.base_rpm)) ||
         config.sample_timeout_ms == 0 || config.sample_timeout_ms >= 0x80000000U ||
         config.gap_hold_ms >= config.loss_timeout_ms || config.loss_timeout_ms >= 0x80000000U)
     {
@@ -35,6 +39,8 @@ bool Track::Init(const Config &config)
     config_ = config;
     pid_.Init(config.kp, config.ki, config.kd);
     pid_.SetLimit(config.integral_limit_rpm, config.maximum_diff_rpm, 0.2f);
+    turn_pid_.Init(config.turn_kp, config.turn_ki, config.turn_kd);
+    turn_pid_.SetLimit(config.integral_limit_rpm, config.maximum_diff_rpm, 0.2f);
     initialized_ = true;
     Reset();
     return true;
@@ -44,6 +50,10 @@ void Track::Reset()
 {
     command_ = {};
     pid_.Reset();
+    turn_pid_.Reset();
+    mode_ = PidMode::Straight;
+    entering_ = leaving_ = false;
+    turn_direction_ = 0;
     last_sample_ms_ = last_line_ms_ = filter_ms_ = 0;
     filtered_error_ = last_diff_rpm_ = last_direction_ = last_base_rpm_ = 0;
     reacquire_count_ = 0;
@@ -85,6 +95,8 @@ bool Track::FindLine(const GraySensor::Sample &sample, float &error) const
 
 void Track::HandleMissingLine(uint32_t now_ms)
 {
+    mode_ = PidMode::Straight;
+    entering_ = leaving_ = false;
     command_.valid = false;
     command_.base_rpm = command_.speed_diff_rpm = 0;
     if (!seen_line_)
@@ -132,16 +144,27 @@ void Track::Follow(float error, uint32_t sample_ms)
     }
     filter_ms_ = sample_ms;
     filter_valid_ = true;
+    SelectPid(filtered_error_, sample_ms, restarting);
+    auto &controller = config_.dual_pid && mode_ == PidMode::Turn ? turn_pid_ : pid_;
     // Calc(error, 0) gives a positive difference for a line on the right.
     if (restarting)
     {
-        pid_.kd_error = pid_.last_kd_error = filtered_error_;
+        controller.kd_error = controller.last_kd_error = filtered_error_;
     }
-    pid_.ManualDt(dt);
-    command_.speed_diff_rpm = pid_.Calc(filtered_error_, 0, config_.maximum_diff_rpm);
+    controller.ManualDt(dt);
+    command_.speed_diff_rpm = controller.Calc(filtered_error_, 0, config_.maximum_diff_rpm);
     command_.base_rpm =
         config_.base_rpm - (config_.base_rpm - config_.turn_rpm) * fabsf(filtered_error_);
-    if (fabsf(filtered_error_) > config_.curve_start_error)
+    if (config_.dual_pid)
+    {
+        command_.base_rpm =
+            fminf(command_.base_rpm, config_.base_rpm - fabsf(command_.speed_diff_rpm));
+        if (mode_ == PidMode::Turn)
+        {
+            command_.base_rpm = fminf(command_.base_rpm, config_.turn_base_limit_rpm);
+        }
+    }
+    if (!config_.dual_pid && fabsf(filtered_error_) > config_.curve_start_error)
     {
         // Preserve the actual centroid and center response; ramp steering only near the edges.
         const float fraction = fminf(1, (fabsf(filtered_error_) - config_.curve_start_error) /
@@ -244,4 +267,79 @@ const Track::Command &Track::Update(const GraySensor::Sample &sample, uint32_t n
 const Track::Command &Track::GetCommand() const
 {
     return command_;
+}
+
+bool Track::SetCruiseRpm(float rpm)
+{
+    if (!initialized_ || !config_.dual_pid || !isfinite(rpm) || rpm < 120 || rpm > 180)
+    {
+        return false;
+    }
+    config_.base_rpm = rpm;
+    return true;
+}
+
+void Track::SelectPid(float error, uint32_t now, bool restarting)
+{
+    if (!config_.dual_pid)
+    {
+        return;
+    }
+    if (restarting)
+    {
+        entering_ = leaving_ = false;
+        mode_ = PidMode::Straight;
+    }
+    const auto previous = mode_;
+    if (mode_ == PidMode::Straight)
+    {
+        const float direction = fabsf(error) >= .25f ? (error > 0 ? 1.f : -1.f) : 0;
+        if (!direction)
+        {
+            entering_ = false;
+        }
+        else
+        {
+            if (!entering_ || direction != turn_direction_)
+            {
+                enter_ms_ = now;
+            }
+            entering_ = true;
+            turn_direction_ = direction;
+            if ((uint32_t)(now - enter_ms_) >= 10)
+            {
+                mode_ = PidMode::Turn;
+                leaving_ = false;
+            }
+        }
+    }
+    else
+    {
+        const bool centered = fabsf(error) <= .16f;
+        const bool opposite = error * turn_direction_ <= -.25f;
+        if (!centered && !opposite)
+        {
+            leaving_ = false;
+        }
+        else
+        {
+            if (!leaving_ || opposite_exit_ != opposite)
+            {
+                exit_ms_ = now;
+            }
+            opposite_exit_ = opposite;
+            leaving_ = true;
+            if ((uint32_t)(now - exit_ms_) >= (opposite ? 25U : 300U))
+            {
+                mode_ = PidMode::Straight;
+                entering_ = leaving_ = false;
+            }
+        }
+    }
+    if (mode_ != previous || restarting)
+    {
+        auto &controller = mode_ == PidMode::Turn ? turn_pid_ : pid_;
+        controller.Reset();
+        controller.kd_error = controller.last_kd_error = error;
+    }
 }

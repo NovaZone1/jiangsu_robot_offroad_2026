@@ -7,6 +7,11 @@
 class Track
 {
 public:
+    enum class PidMode
+    {
+        Straight,
+        Turn
+    };
     enum class State
     {
         Disabled,
@@ -36,6 +41,9 @@ public:
         float integral_limit_rpm = 6;
         float error_filter_tau_s = 0.025f;
         bool white_line = true;
+        bool dual_pid = false;
+        float turn_kp = 28, turn_ki = 0, turn_kd = .25f;
+        float turn_base_limit_rpm = 90;
         bool hold_last_on_gap = false; // Explicit APP policy for bounded blank dashed segments.
         uint8_t reacquire_samples = 3;
         uint32_t sample_timeout_ms = 50;
@@ -58,14 +66,27 @@ public:
     const Command &Update(const GraySensor::Sample &sample, uint32_t now_ms);
     const Command &GetCommand() const;
 
+    PidMode GetPidMode() const
+    {
+        return mode_;
+    }
+
+    bool SetCruiseRpm(float rpm);
+
 private:
     bool FindLine(const GraySensor::Sample &sample, float &error) const;
     void HandleMissingLine(uint32_t now_ms);
     void Follow(float error, uint32_t sample_ms);
+    void SelectPid(float error, uint32_t sample_ms, bool restarting);
 
     Config config_;
     Command command_;
     PidGeneral pid_;
+    PidGeneral turn_pid_;
+    PidMode mode_ = PidMode::Straight;
+    float turn_direction_ = 0;
+    uint32_t enter_ms_ = 0, exit_ms_ = 0;
+    bool entering_ = false, leaving_ = false, opposite_exit_ = false;
     uint32_t last_sample_ms_ = 0;
     uint32_t last_line_ms_ = 0;
     uint32_t filter_ms_ = 0;

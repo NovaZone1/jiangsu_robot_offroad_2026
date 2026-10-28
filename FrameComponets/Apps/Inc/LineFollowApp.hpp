@@ -4,6 +4,8 @@
 #include "Track.hpp"
 #include "SpeedMixer.hpp"
 #include "MotorSpeedDisplay.hpp"
+#include "CoursePlanner.hpp"
+#include "FinishLineGate.hpp"
 
 // Application lifecycle and all four motor writes remain owned by the framework task.
 class LineFollowApp : public Application
@@ -18,6 +20,7 @@ public:
         float deceleration_rpm_s = 240;
         bool split_steering_slew = false;
         float steering_slew_rpm_s = 240; // Half left/right difference per second.
+        bool course_run = false;
     };
 
     LineFollowApp(GraySensor &gray, DcMotor &m1, DcMotor &m2, DcMotor &m3, DcMotor &m4);
@@ -31,6 +34,22 @@ public:
     const Track::Command &GetTrackCommand() const;
     SpeedMixer &GetSpeedMixer(); // Future APP policies share this single motor writer.
     const Track::Config &GetTrackConfig() const;
+
+    const CoursePlanner::Status &GetCourseStatus() const
+    {
+        return course_.GetStatus();
+    }
+
+    const FinishLineGate::Status &GetFinishStatus() const
+    {
+        return finish_.GetStatus();
+    }
+
+    Track::PidMode GetPidMode() const
+    {
+        return track_.GetPidMode();
+    }
+
     bool ConfigureTrackPid(float kp, float ki, float kd); // Stopped and all motors disabled only.
 
 protected:
@@ -50,4 +69,9 @@ private:
     uint32_t last_control_ms_ = 0;
     bool initialized_ = false;
     bool running_ = false;
+    CoursePlanner course_;
+    FinishLineGate finish_;
+    uint32_t distance_ms_[4] = {};
+    float wheel_distance_m_[4] = {};
+    bool UpdateCourse(uint32_t now);
 };

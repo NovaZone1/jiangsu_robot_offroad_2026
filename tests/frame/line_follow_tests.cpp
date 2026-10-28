@@ -420,9 +420,52 @@ extern "C" BspOledBus_Status BspOledBus_Poll(void)
     return (int32_t)(test_tick - bus_ready_ms) < 0 ? BspOledBus_Busy : BspOledBus_Idle;
 }
 
+static void TestDualPid()
+{
+    Track t;
+    Track::Config c;
+    c.base_rpm = 120;
+    c.turn_rpm = 72;
+    c.maximum_diff_rpm = 60;
+    c.dual_pid = true;
+    c.kp = 10;
+    c.ki = 0;
+    c.kd = 0;
+    c.turn_kp = 30;
+    c.turn_ki = 0;
+    c.turn_kd = 0;
+    c.error_filter_tau_s = 0;
+    c.reacquire_samples = 1;
+    assert(t.Init(c));
+    t.Update(MakeSample(0x18, 5), 5);
+    auto a = t.Update(MakeSample(0x30, 10), 10);
+    assert(t.GetPidMode() == Track::PidMode::Straight &&
+           fabsf(a.speed_diff_rpm - 20.f / 7) < .0001f);
+    t.Update(MakeSample(0x30, 15), 15);
+    auto b = t.Update(MakeSample(0x30, 20), 20);
+    assert(t.GetPidMode() == Track::PidMode::Turn && fabsf(b.speed_diff_rpm - 60.f / 7) < .0001f);
+    assert(b.base_rpm <= 90 && t.SetCruiseRpm(180));
+    auto high = t.Update(MakeSample(0x30, 25), 25);
+    assert(fabsf(high.speed_diff_rpm - b.speed_diff_rpm) < .0001f);
+    for (unsigned ms = 30; ms < 330; ms += 5)
+    {
+        t.Update(MakeSample(0x18, ms), ms);
+    }
+    assert(t.GetPidMode() == Track::PidMode::Turn);
+    t.Update(MakeSample(0x18, 330), 330);
+    assert(t.GetPidMode() == Track::PidMode::Straight);
+    t.Reset();
+    assert(t.GetPidMode() == Track::PidMode::Straight);
+    c.turn_kp = -1;
+    assert(!t.Init(c));
+    puts("PASS: independent conventional straight/turn PIDs, fixed gains, fresh switching dwell, "
+         "limits and reset");
+}
+
 int main()
 {
     TestTrack();
+    TestDualPid();
     TestMixer();
     TestFormatting();
     TestApplication();

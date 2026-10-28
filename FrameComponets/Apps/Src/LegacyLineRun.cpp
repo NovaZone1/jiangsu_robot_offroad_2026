@@ -13,19 +13,27 @@ LineFollowApp::Config LegacyLineRun::Configuration()
 {
     LineFollowApp::Config config;
     config.maximum_rpm = TargetRpm;
-    config.track.base_rpm = TargetRpm;
-    config.track.turn_rpm = TargetRpm * 0.6f;
+    config.allow_180_rpm = true;
+    config.course_run = true;
+    config.track.base_rpm = BaseRpm;
+    config.track.turn_rpm = BaseRpm * 0.6f;
     config.track.kp = DefaultKp;
     config.track.ki = 0;
     config.track.kd = DefaultKd;
-    config.track.maximum_diff_rpm = TargetRpm * 0.5f;
+    config.track.maximum_diff_rpm = BaseRpm * 0.5f;
+    config.track.dual_pid = true;
+    config.track.turn_kp = TurnKp;
+    config.track.turn_ki = TurnKi;
+    config.track.turn_kd = TurnKd;
     config.track.white_line = true;
     config.track.hold_last_on_gap = true;
     // 60 mm blank allowance at 80% speed, plus 20 ms reacquisition; loss stays 1200 ms.
     config.track.gap_hold_ms = (uint32_t)fminf(
-        300, fmaxf(120, ceilf(60000.0f * 60.0f / (3.14159265f * 64.0f * TargetRpm * 0.8f)) + 20));
+        300, fmaxf(120, ceilf(60000.0f * 60.0f / (3.14159265f * 64.0f * BaseRpm * 0.8f)) + 20));
     config.split_steering_slew = true;
     config.steering_slew_rpm_s = 240;
+    config.deceleration_rpm_s = 480;
+    config.steering_slew_rpm_s = 480;
     return config;
 }
 
@@ -265,6 +273,12 @@ void LegacyLineRun::Run()
     }
     if (status_.phase == Phase::Running)
     {
+        if (line_.GetFinishStatus().phase == FinishLineGate::Phase::Done)
+        {
+            Stop();
+            UpdateDisplay();
+            return;
+        }
         line_.Control();
         if (System.GetState() != Systems::WORKING)
         {
@@ -331,8 +345,11 @@ void LegacyLineRun::UpdateDisplay()
     }
     else if (status_.phase == Phase::Running)
     {
-        snprintf(text, sizeof(text), "LINE %u STATE %u", (unsigned)TargetRpm,
-                 (unsigned)status_.track_state);
+        static const char *const phases[] = {"LOW", "UP",   "FAST", "DOWN",
+                                             "APP", "TURN", "EXIT", "ERR"};
+        const auto &s = line_.GetCourseStatus();
+        snprintf(text, sizeof(text), "J180 %s C%u", phases[(unsigned)s.phase],
+                 (unsigned)s.cruise_rpm);
     }
     else if (status_.phase == Phase::Stopped)
     {
@@ -349,7 +366,20 @@ void LegacyLineRun::UpdateDisplay()
             (unsigned long)((status_.hold_ms / 100U) % 10U), (unsigned long)(StartHoldMs / 1000U));
     }
     display_.SetLine(0, text);
-    if (range_.HasFreshSample(now, 100))
+    if (status_.phase == Phase::Fault)
+    {
+        const auto &p = protection_.GetStatus();
+        snprintf(text, sizeof(text), "PROTECT %u M%u", (unsigned)p.fault, (unsigned)p.failed_port);
+    }
+    else if (status_.phase == Phase::Running || status_.phase == Phase::Stopped)
+    {
+        const auto &s = line_.GetCourseStatus();
+        const unsigned cm = (unsigned)fminf(99999, fmaxf(0, s.distance_m * 100));
+        snprintf(text, sizeof(text), "L%u/3 K%u/6 B%u S%u.%u",
+                 line_.GetFinishStatus().crossings / 2, line_.GetFinishStatus().crossings,
+                 s.completed_bends, cm / 100, (cm % 100) / 10);
+    }
+    else if (range_.HasFreshSample(now, 100))
     {
         const unsigned mm = (unsigned)fminf(range_.GetSample().distance_mm, 9999.0f);
         snprintf(text, sizeof(text), "US %u.%u CM", mm / 10, mm % 10);
